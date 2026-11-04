@@ -1,0 +1,15 @@
+"""Configuration shared by the initial game systems."""
+
+WINDOW_SIZE = (1280, 720)
+LOGICAL_SIZE = (640, 360)
+FPS = 60
+MAX_FRAME_TIME = 0.1
+PLAYER_SPEED = 220.0
+PLAYER_SIZE = (16, 20)
+ARENA_RECT = (48, 42, 544, 270)
+
+BACKGROUND = (14, 16, 29)
+PANEL = (28, 30, 49)
+ACCENT = (107, 217, 224)
+TEXT = (232, 230, 220)
+MUTED = (159, 161, 179)
