@@ -1,0 +1,11 @@
+Ninja Adventure Asset Pack — Pixel-Boy e AAA, CC0 1.0 Universal.
+Origem: https://pixel-boy.itch.io/ninja-adventure-asset-pack
+Espelho: https://github.com/series-ai/jam-ready-assets/tree/main/ninja-adventure/2D/top-down-rpg/Actor
+Arquivos mago_laranja.png, ninja.png, guerreiro.png, feiticeiro.png, dragao.png e partes dragao_chefe_*.png.
+
+Goblin, de carnageddon — https://opengameart.org/content/goblin-3
+Arquivo goblin.png, CC0 1.0 Universal.
+
+Steel Golem Walking, de DanyOctrome — https://opengameart.org/content/steel-golem-walking
+Arquivo golem.png, CC0 1.0 Universal.
+Texto da licença: https://creativecommons.org/publicdomain/zero/1.0/
