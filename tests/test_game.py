@@ -65,6 +65,7 @@ class GameStateTests(unittest.TestCase):
 
     def test_arena_renders_when_optional_art_is_missing(self):
         self.game.tiles = None
+        self.game.mage_sheet = None
         self.game.state = GameState.PLAYING
         self.game.draw()
 
@@ -76,6 +77,8 @@ class GameStateTests(unittest.TestCase):
     def test_progression_upgrades_and_victory(self):
         self.key(pygame.K_RETURN)
         self.key(pygame.K_e)
+        self.assertEqual(self.game.state, GameState.TRANSITION)
+        self.game.update(2.0)
         self.assertEqual(self.game.world.room_index, 1)
         self.key(pygame.K_e)
         self.assertEqual(self.game.world.room_index, 1)
@@ -84,8 +87,11 @@ class GameStateTests(unittest.TestCase):
         self.game.update(0.01)
         self.assertEqual(self.game.state, GameState.UPGRADE)
         self.key(pygame.K_1)
+        self.assertEqual(self.game.state, GameState.LEVEL_UP)
+        self.game.update(2.0)
         self.assertEqual(self.game.state, GameState.PLAYING)
         self.key(pygame.K_e)
+        self.game.update(2.0)
         self.assertEqual(self.game.world.room_index, 2)
         self.game.world.load_room(3)
         self.game.world.enemies[0].take_damage(1000)
@@ -124,3 +130,34 @@ class GameStateTests(unittest.TestCase):
             sounds = Sounds()
             self.assertEqual(sounds.clips, {})
             sounds.play('cast')
+
+    def test_transition_freezes_world_and_loads_next_room_once(self):
+        self.key(pygame.K_RETURN)
+        self.key(pygame.K_e)
+        self.assertEqual(self.game.state, GameState.TRANSITION)
+        self.game.update(0.2)
+        self.assertEqual(self.game.world.room_index, 0)
+        self.key(pygame.K_e)
+        self.game.update(1.0)
+        self.assertEqual(self.game.world.room_index, 1)
+        first_enemy = self.game.world.enemies[0]
+        first_position = first_enemy.position.copy()
+        self.game.update(0.2)
+        self.assertEqual(first_enemy.position, first_position)
+        self.game.update(1.0)
+        self.assertEqual(self.game.state, GameState.PLAYING)
+        self.assertIs(self.game.world.enemies[0], first_enemy)
+
+    def test_upgrade_animation_applies_reward_only_once(self):
+        self.key(pygame.K_RETURN)
+        self.game.world.load_room(1)
+        for enemy in self.game.world.enemies:
+            enemy.take_damage(1000)
+        self.game.update(0.01)
+        self.key(pygame.K_1)
+        self.assertEqual(self.game.state, GameState.LEVEL_UP)
+        self.assertAlmostEqual(self.game.player.damage_multiplier, 1.2)
+        self.key(pygame.K_1)
+        self.game.update(2.0)
+        self.assertEqual(self.game.state, GameState.PLAYING)
+        self.assertAlmostEqual(self.game.player.damage_multiplier, 1.2)
