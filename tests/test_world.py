@@ -2,6 +2,7 @@ import unittest
 
 import pygame
 
+from src.combat import Projectile
 from src.player import Player
 from src.world import World
 
@@ -51,6 +52,55 @@ class WorldTests(unittest.TestCase):
         self.assertTrue(self.world.projectiles)
         self.world.load_room(1)
         self.assertFalse(self.world.projectiles)
+
+    def test_dead_boss_clears_hostile_attacks_before_damage(self):
+        self.world.load_room(3)
+        self.world.hazards.append([self.player.position.copy(), 0.01])
+        self.world.projectiles.append(Projectile(self.player.position, (1, 0), 30, 0, friendly=False))
+        self.world.enemies[0].take_damage(1000)
+        self.world.update(0.02)
+        self.assertEqual(self.player.hp, 100)
+        self.assertFalse(self.world.hazards)
+        self.assertFalse(self.world.projectiles)
+
+    def test_explosion_damages_only_nearby_enemies_and_has_cooldown(self):
+        self.world.load_room(1)
+        near, far = self.world.enemies[:2]
+        near.position = self.player.position + pygame.Vector2(25, 0)
+        far.position = self.player.position + pygame.Vector2(-180, 0)
+        self.assertTrue(self.world.explode())
+        self.assertEqual(near.hp, 12)
+        self.assertEqual(far.hp, 30)
+        self.assertFalse(self.world.explode())
+
+    def test_projectile_reaches_enemy_and_applies_damage(self):
+        self.world.load_room(1)
+        target = self.world.enemies[0]
+        target.position = self.player.position + pygame.Vector2(30, 0)
+        self.world.fire(target.position, 'basic')
+        self.world.update(0.06)
+        self.assertEqual(target.hp, 20)
+
+    def test_simulated_run_can_clear_all_combat_rooms(self):
+        for room in range(1, 4):
+            self.world.load_room(room)
+            for _ in range(3600):
+                alive = [enemy for enemy in self.world.enemies if enemy.alive]
+                if not alive or self.player.hp <= 0:
+                    break
+                target = min(alive, key=lambda enemy: enemy.position.distance_to(self.player.position))
+                delta = self.player.position - target.position
+                move = delta.normalize() if 0 < delta.length() < 105 else pygame.Vector2()
+                self.player.update(move, 1 / 60, self.world.bounds)
+                self.world.fire(target.position, 'basic')
+                self.world.fire(target.position, 'spear')
+                if delta.length() < 65:
+                    self.world.explode()
+                self.world.update(1 / 60)
+            self.assertTrue(self.world.complete, f'Sala {room} não foi concluída')
+            self.assertGreater(self.player.hp, 0)
+            if room < 3:
+                self.world.apply_upgrade('vital')
 
 
 if __name__ == '__main__':

@@ -99,3 +99,20 @@ class GameStateTests(unittest.TestCase):
         self.assertEqual(self.game.state, GameState.PLAYING)
         self.assertEqual(self.game.player.hp, 100)
         self.assertEqual(self.game.world.room_index, 0)
+
+    def test_mouse_attacks_and_cooldowns(self):
+        self.key(pygame.K_RETURN)
+        event = pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=3, pos=(800, 300))
+        self.game.handle_event(event)
+        self.game.handle_event(event)
+        self.assertEqual(len(self.game.world.projectiles), 1)
+        self.assertEqual(self.game.world.projectiles[0].max_hits, 2)
+        self.assertGreater(self.game.player.cooldowns['spear'], 0)
+
+    def test_draw_combat_objects_and_telegraph(self):
+        self.key(pygame.K_RETURN)
+        self.game.world.load_room(3)
+        self.game.world.enemies[0].windup = 0.5
+        self.game.world.hazards.append([pygame.Vector2(320, 180), 0.5])
+        self.game.world.fire((400, 100), 'spear')
+        self.game.draw()
