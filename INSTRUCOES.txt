@@ -14,11 +14,14 @@ No menu: mouse ou setas e Enter. Nas melhorias: clique ou teclas 1, 2 e 3.
 A confirmação da melhoria e a transição de nível são exibidas automaticamente.
 
 OBJETIVO
-Atravesse a câmara inicial, derrote os inimigos em duas arenas, escolha uma
-melhoria após cada arena e derrote o Guardião do Núcleo para purificar o
-cristal. Caso sua vida termine, escolha Reiniciar para tentar novamente.
+Atravesse a câmara inicial e enfrente dez níveis. Cada nível comum tem duas
+ondas; os níveis 5 e 10 têm chefes. Escolha melhorias entre os níveis e
+derrote o Dragão do Núcleo para purificar o cristal. Caso sua vida termine,
+escolha Reiniciar para tentar novamente.
 
 CRÉDITOS DE RECURSOS
 Tiny Dungeon e Interface Sounds por Kenney, licença CC0. As licenças e
 fontes dos arquivos estão nas pastas assets/sprites e assets/audio.
 16x16 Mage por saint11, CC0; Pixelify Sans sob SIL Open Font License 1.1.
+Ninja Adventure por Pixel-Boy e AAA, Goblin por carnageddon, Steel Golem
+Walking por DanyOctrome: CC0. Detalhes em assets/sprites/ninja-adventure.
