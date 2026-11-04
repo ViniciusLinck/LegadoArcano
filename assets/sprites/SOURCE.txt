@@ -1,0 +1,4 @@
+Tiny Dungeon 1.0, por Kenney — https://kenney.nl/assets/tiny-dungeon
+Licença: Creative Commons CC0 1.0. Arquivo obtido de espelho público:
+https://github.com/chaewonkong/tiny_dungeon/tree/main/assets/kenney_tiny-dungeon
+Licença original incluída em LICENSE-kenney.txt.
