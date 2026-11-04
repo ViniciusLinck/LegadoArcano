@@ -1,0 +1,6 @@
+Tilesets de cenário do Ninja Adventure Asset Pack, por Pixel-Boy e AAA.
+Origem: https://pixel-boy.itch.io/ninja-adventure-asset-pack
+Espelho: https://github.com/series-ai/jam-ready-assets/tree/main/ninja-adventure/2D/top-down-rpg/Backgrounds/Tilesets
+Licença: Creative Commons CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+Os layouts de fases neste jogo foram compostos a partir dessas peças.
