@@ -92,7 +92,7 @@ class WorldTests(unittest.TestCase):
                 if self.world.complete or self.player.hp <= 0:
                     break
                 if not alive:
-                    self.player.update((0, 0), 1 / 60, self.world.bounds)
+                    self.player.update((0, 0), 1 / 60, self.world.bounds, self.world.obstacles)
                     self.world.update(1 / 60)
                     continue
                 target = min(alive, key=lambda enemy: enemy.position.distance_to(self.player.position))
@@ -101,7 +101,17 @@ class WorldTests(unittest.TestCase):
                 if target.is_boss and delta.length() > 0:
                     normal = delta.normalize()
                     move = normal if delta.length() < 80 else (-normal if delta.length() > 135 else pygame.Vector2(-normal.y, normal.x))
-                self.player.update(move, 1 / 60, self.world.bounds)
+                blocked = [rect for rect in self.world.obstacles
+                           if rect.inflate(12, 12).clipline(self.player.position, target.position)]
+                if blocked and delta.length_squared():
+                    normal = pygame.Vector2(-delta.y, delta.x).normalize()
+                    center = pygame.Vector2(blocked[0].center)
+                    waypoint = min((center + normal * 48, center - normal * 48),
+                                   key=lambda point: point.distance_squared_to(self.player.position))
+                    heading = waypoint - self.player.position
+                    if heading.length_squared():
+                        move = heading.normalize()
+                self.player.update(move, 1 / 60, self.world.bounds, self.world.obstacles)
                 self.world.fire(target.position, 'basic')
                 self.world.fire(target.position, 'spear')
                 if delta.length() < 65:

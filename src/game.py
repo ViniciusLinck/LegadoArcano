@@ -8,6 +8,8 @@ import pygame
 from src import settings
 from src.assets import Sounds, resource_path
 from src.animation import character_frame, creature_frame
+from src.maps import MapRenderer
+from src.effects import EFFECT_DURATIONS, EffectLibrary
 from src.player import Player
 from src.ui import Menu
 from src.world import World
@@ -34,13 +36,13 @@ class Game:
         self.clock = pygame.time.Clock()
         self.menu = Menu()
         self.sounds = Sounds()
+        self.effect_library = EffectLibrary()
         self.state = GameState.MENU
         self.running = True
         self.bounds = pygame.Rect(settings.ARENA_RECT)
+        self.map_renderer = MapRenderer(self.bounds)
         self.player = Player(self.bounds.center)
         self.world = World(self.player, self.bounds)
-        self.tiles = self._load_tiles()
-        self.floor_tiles = self._make_floor_tiles()
         self.mage_sheet = self._load_mage()
         self.enemy_sheets = self._load_enemy_sheets()
         self.dragon_parts = self._load_dragon_parts()
@@ -52,12 +54,6 @@ class Game:
         self.room_loaded = False
         self.upgrade_label = ''
         self.cast_time = 0.0
-
-    def _load_tiles(self):
-        try:
-            return pygame.image.load(str(resource_path('assets', 'sprites', 'tiny_dungeon.png'))).convert_alpha()
-        except (FileNotFoundError, pygame.error, OSError):
-            return None
 
     def _load_mage(self):
         try:
@@ -86,16 +82,6 @@ class Game:
             except (FileNotFoundError, pygame.error, OSError):
                 return {}
         return parts
-
-    def _make_floor_tiles(self):
-        if not self.tiles:
-            return []
-        variants = []
-        for tint in ((113, 125, 145), (99, 112, 133), (124, 130, 151)):
-            floor = self.tiles.subsurface((64, 48, 16, 16)).copy()
-            floor.fill(tint, special_flags=pygame.BLEND_RGB_MULT)
-            variants.append(floor)
-        return variants
 
     def _new_run(self):
         self.player = Player(self.bounds.center)
@@ -246,9 +232,9 @@ class Game:
         keys = pygame.key.get_pressed()
         direction = (int(keys[pygame.K_d]) - int(keys[pygame.K_a]),
                      int(keys[pygame.K_s]) - int(keys[pygame.K_w]))
-        self.player.update(direction, dt, self.bounds)
+        self.player.update(direction, dt, self.bounds, self.world.obstacles)
         if self.player.dash_time > 0 and len(self.world.effects) < 20:
-            self.world.effects.append([self.player.position.copy(), 0.16, 'dash'])
+            self.world.effects.append([self.player.position.copy(), EFFECT_DURATIONS['dash'], 'dash'])
         if pygame.mouse.get_pressed()[0]:
             if self.world.fire(self._logical_pos(pygame.mouse.get_pos()), 'basic'):
                 self.cast_time = 0.16
@@ -264,22 +250,7 @@ class Game:
                 self.state = GameState.VICTORY
 
     def _draw_arena(self):
-        self.canvas.fill(settings.BACKGROUND)
-        pygame.draw.rect(self.canvas, (39, 40, 53), self.bounds)
-        if self.tiles and self.floor_tiles:
-            self.canvas.set_clip(self.bounds)
-            for y in range(self.bounds.top, self.bounds.bottom, 16):
-                for x in range(self.bounds.left, self.bounds.right, 16):
-                    variation = ((x // 16) * 17 + (y // 16) * 31) % 11
-                    floor = self.floor_tiles[1 if variation == 0 else 2 if variation == 1 else 0]
-                    self.canvas.blit(floor, (x, y))
-            self.canvas.set_clip(None)
-        pygame.draw.rect(self.canvas, (122, 101, 148), self.bounds, 3)
-        if self.tiles:
-            torch = self.tiles.subsurface((80, 32, 16, 16))
-            for x in (self.bounds.left - 17, self.bounds.right + 1):
-                for y in (self.bounds.top + 24, self.bounds.bottom - 40):
-                    self.canvas.blit(torch, (x, y))
+        self.canvas.blit(self.map_renderer.get(self.world.room_index), (0, 0))
         for pos, timer in self.world.hazards:
             pygame.draw.circle(self.canvas, (210, 70, 80), pos, 32, 2)
             pygame.draw.circle(self.canvas, (235, 120, 90), pos, max(2, int(32 * (1 - min(timer, 1)))), 1)
@@ -314,14 +285,9 @@ class Game:
                 pygame.draw.rect(self.canvas, (30, 20, 30), (enemy.rect.left, bar_y, enemy.size, 3))
                 pygame.draw.rect(self.canvas, (220, 80, 95), (enemy.rect.left, bar_y, int(enemy.size * enemy.hp / enemy.max_hp), 3))
         for shot in self.world.projectiles:
-            color = (255, 222, 120) if shot.friendly and shot.max_hits > 1 else ((102, 235, 250) if shot.friendly else (247, 101, 140))
-            if shot.friendly and shot.max_hits > 1:
-                pygame.draw.line(self.canvas, color, shot.position, shot.position - shot.direction * 14, 3)
-            pygame.draw.circle(self.canvas, color, shot.position, shot.radius)
-            pygame.draw.circle(self.canvas, (245, 245, 250), shot.position, max(2, shot.radius // 2))
+            self._draw_projectile(shot)
         for pos, time, kind in self.world.effects:
-            radius = int((0.35 - time) * 160) if kind == 'explosion' else (5 if kind == 'dash' else 9)
-            pygame.draw.circle(self.canvas, (110, 235, 240) if kind != 'hazard' else (250, 100, 90), pos, max(2, radius), 2)
+            self._draw_effect(pos, time, kind)
         if self.world.room_index == self.world.final_level and self.world.complete:
             center = (320, 160)
             pygame.draw.polygon(self.canvas, settings.ACCENT, [(320, 142), (332, 160), (320, 178), (308, 160)])
@@ -339,6 +305,56 @@ class Game:
             radius = 11 + int((0.22 - min(0.22, self.cast_time)) * 38)
             pygame.draw.circle(self.canvas, (121, 222, 225), self.player.rect.center, radius, 1)
         self.menu.draw_hud(self.canvas, self.player, self.world)
+
+    def _blit_effect(self, name, position, elapsed, duration, size, angle=0, tint=None, loop=False):
+        sprite = self.effect_library.frame(name, elapsed, duration, loop)
+        if sprite is None:
+            return False
+        sprite = pygame.transform.scale(sprite, size)
+        if tint:
+            sprite = sprite.copy()
+            sprite.fill(tint, special_flags=pygame.BLEND_RGBA_MULT)
+        if angle:
+            sprite = pygame.transform.rotate(sprite, angle)
+        self.canvas.blit(sprite, sprite.get_rect(center=position))
+        return True
+
+    def _draw_projectile(self, shot):
+        if shot.friendly and shot.max_hits > 1:
+            # The bolt follows its actual aim direction while the sprite cycles.
+            angle = -math.degrees(math.atan2(shot.direction.y, shot.direction.x))
+            color = (255, 213, 115)
+            pygame.draw.line(self.canvas, (137, 91, 50), shot.position - shot.direction * 24, shot.position, 5)
+            pygame.draw.line(self.canvas, color, shot.position - shot.direction * 24, shot.position, 2)
+            drawn = self._blit_effect('lightning', shot.position, shot.age, 0.48,
+                                      (36, 26), angle=angle, loop=True)
+        else:
+            color = (109, 225, 242) if shot.friendly else (240, 115, 149)
+            pygame.draw.circle(self.canvas, color, shot.position, shot.radius + 3, 1)
+            tint = None if shot.friendly else (255, 95, 150, 255)
+            drawn = self._blit_effect('orb', shot.position, shot.age, 0.4,
+                                      (22, 22), tint=tint, loop=True)
+        if not drawn:
+            pygame.draw.circle(self.canvas, color, shot.position, shot.radius)
+
+    def _draw_effect(self, position, remaining, kind):
+        duration = EFFECT_DURATIONS.get(kind, 0.3)
+        elapsed = max(0.0, duration - remaining)
+        if kind == 'explosion':
+            # Two layers use the licensed magic ring and blue burst sprites.
+            pygame.draw.circle(self.canvas, (89, 195, 210), position, 68, 1)
+            self._blit_effect('ring', position, elapsed, duration, (116, 116))
+            if not self._blit_effect('burst', position, elapsed, duration, (136, 136)):
+                pygame.draw.circle(self.canvas, settings.ACCENT, position, max(2, int(68 * elapsed / duration)), 2)
+        elif kind == 'cast':
+            self._blit_effect('ring', position, elapsed, duration, (46, 46))
+        elif kind in ('impact', 'hazard'):
+            tint = (255, 110, 110, 255) if kind == 'hazard' else None
+            if not self._blit_effect('impact', position, elapsed, duration, (32, 36), tint=tint):
+                pygame.draw.circle(self.canvas, (240, 180, 130), position, 8, 2)
+        elif kind in ('dash', 'death'):
+            if not self._blit_effect('smoke', position, elapsed, duration, (34, 16)):
+                pygame.draw.circle(self.canvas, settings.ACCENT, position, 6, 1)
 
     def _draw_dragon_boss(self, enemy):
         """Layer the original CC0 dragon pieces and animate the wings."""

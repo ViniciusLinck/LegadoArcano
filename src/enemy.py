@@ -5,6 +5,7 @@ import math
 import pygame
 
 from src.combat import Projectile
+from src.collision import move_with_collisions
 
 
 class Enemy:
@@ -30,6 +31,8 @@ class Enemy:
         self.animation_time = 0.0
         self.attacking_time = 0.0
         self.moving = False
+        self.detour_time = 0.0
+        self.detour_sign = 1 if position[0] < 320 else -1
 
     @property
     def alive(self):
@@ -49,7 +52,7 @@ class Enemy:
             self.hp = max(0, self.hp - damage)
             self.hit_flash = 0.12
 
-    def update(self, dt, player, bounds):
+    def update(self, dt, player, bounds, obstacles=()):
         if not self.alive:
             return []
         previous_position = self.position.copy()
@@ -58,6 +61,7 @@ class Enemy:
         self.hit_flash = max(0, self.hit_flash - dt)
         self.animation_time += dt
         self.attacking_time = max(0, self.attacking_time - dt)
+        self.detour_time = max(0, self.detour_time - dt)
         delta = player.position - self.position
         distance = delta.length()
         direction = delta.normalize() if distance else pygame.Vector2(1, 0)
@@ -106,8 +110,17 @@ class Enemy:
                     self.attacking_time = 0.3
                     player.take_damage(self.damage)
                     self.cooldown = 0.8 if self.kind == 'ninja' else 1.0
-        half = self.size / 2
-        self.position.x = max(bounds.left + half, min(bounds.right - half, self.position.x))
-        self.position.y = max(bounds.top + half, min(bounds.bottom - half, self.position.y))
+        desired = self.position - previous_position
+        if self.detour_time > 0 and desired.length_squared() > 0:
+            desired = pygame.Vector2(-direction.y, direction.x) * self.detour_sign * self.speed * dt
+        self.position = move_with_collisions(previous_position, (self.size, self.size), desired, bounds, obstacles)
+        if desired.length_squared() > 0 and self.position.distance_to(previous_position) < min(0.2, desired.length() * 0.2):
+            side = pygame.Vector2(-direction.y, direction.x) * self.detour_sign * self.speed * dt
+            alternative = move_with_collisions(previous_position, (self.size, self.size), side, bounds, obstacles)
+            if alternative.distance_to(previous_position) < 0.1:
+                self.detour_sign *= -1
+                alternative = move_with_collisions(previous_position, (self.size, self.size), -side, bounds, obstacles)
+            self.position = alternative
+            self.detour_time = 0.6
         self.moving = self.position != previous_position
         return output

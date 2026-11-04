@@ -3,6 +3,7 @@
 import pygame
 
 from src import settings
+from src.collision import move_with_collisions
 from src.settings import PLAYER_SIZE, PLAYER_SPEED
 
 
@@ -46,7 +47,7 @@ class Player:
         self.dash_time = settings.DASH_DURATION
         return True
 
-    def update(self, direction: tuple[float, float], dt: float, bounds: pygame.Rect) -> None:
+    def update(self, direction: tuple[float, float], dt: float, bounds: pygame.Rect, obstacles=()) -> None:
         dt = max(0.0, dt)
         for key in self.cooldowns:
             self.cooldowns[key] = max(0.0, self.cooldowns[key] - dt)
@@ -58,9 +59,6 @@ class Player:
             self.facing = movement.copy()
         dash_step = min(dt, self.dash_time)
         self.dash_time = max(0.0, self.dash_time - dt)
-        self.position += self.dash_direction * settings.DASH_SPEED * dash_step
-        self.position += movement * PLAYER_SPEED * (dt - dash_step)
-        half_width, half_height = self.rect.width / 2, self.rect.height / 2
-        self.position.x = max(bounds.left + half_width, min(bounds.right - half_width, self.position.x))
-        self.position.y = max(bounds.top + half_height, min(bounds.bottom - half_height, self.position.y))
+        delta = self.dash_direction * settings.DASH_SPEED * dash_step + movement * PLAYER_SPEED * (dt - dash_step)
+        self.position = move_with_collisions(self.position, self.rect.size, delta, bounds, obstacles)
         self.rect.center = self.position

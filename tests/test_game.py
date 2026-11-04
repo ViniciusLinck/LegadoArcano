@@ -72,7 +72,8 @@ class GameStateTests(unittest.TestCase):
                 self.game.draw()
 
     def test_arena_renders_when_optional_art_is_missing(self):
-        self.game.tiles = None
+        self.game.map_renderer.atlases.clear()
+        self.game.map_renderer.cache.clear()
         self.game.mage_sheet = None
         self.game.state = GameState.PLAYING
         self.game.draw()
@@ -129,6 +130,16 @@ class GameStateTests(unittest.TestCase):
         self.game.world.enemies[0].windup = 0.5
         self.game.world.hazards.append([pygame.Vector2(320, 180), 0.5])
         self.game.world.fire((400, 100), 'spear')
+        self.game.draw()
+
+    def test_draw_animated_spells_and_missing_effect_fallback(self):
+        self.key(pygame.K_RETURN)
+        self.game.world.load_room(3)
+        self.game.world.fire((450, 120), 'spear')
+        self.game.world.explode()
+        self.game.update(0.15)
+        self.game.draw()
+        self.game.effect_library.sheets.clear()
         self.game.draw()
 
     def test_audio_is_optional_when_mixer_unavailable(self):

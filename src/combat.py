@@ -13,9 +13,11 @@ class Projectile:
         self.max_hits = max_hits
         self.friendly = friendly
         self.lifetime = lifetime
+        self.age = 0.0
         self.alive = True
         self.hit_targets = set()
         self.radius = 5 if friendly else 6
+        self.blocked = False
 
     @property
     def rect(self):
@@ -30,8 +32,18 @@ class Projectile:
             self.alive = False
         return True
 
-    def update(self, dt, bounds):
+    def update(self, dt, bounds, obstacles=()):
+        previous = self.position.copy()
         self.position += self.direction * self.speed * dt
+        self.age += dt
         self.lifetime -= dt
-        if self.lifetime <= 0 or not bounds.collidepoint(self.position):
+        intersections = [pygame.Rect(item).inflate(self.radius * 2, self.radius * 2).clipline(previous, self.position)
+                         for item in obstacles]
+        intersections = [segment for segment in intersections if segment]
+        if intersections:
+            closest = min((pygame.Vector2(segment[0]) for segment in intersections),
+                          key=lambda point: point.distance_squared_to(previous))
+            self.position = closest
+            self.blocked = True
+        if self.lifetime <= 0 or self.blocked or not bounds.collidepoint(self.position):
             self.alive = False
