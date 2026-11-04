@@ -18,7 +18,10 @@ class WorldTests(unittest.TestCase):
         self.assertFalse(self.world.complete)
         for enemy in self.world.enemies:
             enemy.take_damage(1000)
-        self.world.update(0.01)
+        self.assertFalse(self.world.complete)
+        self.world.update(0.81)
+        for enemy in self.world.enemies:
+            enemy.take_damage(1000)
         self.assertTrue(self.world.complete)
 
     def test_dead_enemy_cannot_attack(self):
@@ -39,7 +42,7 @@ class WorldTests(unittest.TestCase):
         self.assertAlmostEqual(self.player.cooldown_multiplier, 0.8)
 
     def test_boss_changes_phase_at_half_health(self):
-        self.world.load_room(3)
+        self.world.load_room(5)
         boss = self.world.enemies[0]
         boss.take_damage(150)
         self.assertEqual(boss.phase, 2)
@@ -54,7 +57,7 @@ class WorldTests(unittest.TestCase):
         self.assertFalse(self.world.projectiles)
 
     def test_dead_boss_clears_hostile_attacks_before_damage(self):
-        self.world.load_room(3)
+        self.world.load_room(5)
         self.world.hazards.append([self.player.position.copy(), 0.01])
         self.world.projectiles.append(Projectile(self.player.position, (1, 0), 30, 0, friendly=False))
         self.world.enemies[0].take_damage(1000)
@@ -82,15 +85,22 @@ class WorldTests(unittest.TestCase):
         self.assertEqual(target.hp, 20)
 
     def test_simulated_run_can_clear_all_combat_rooms(self):
-        for room in range(1, 4):
+        for room in range(1, 11):
             self.world.load_room(room)
             for _ in range(3600):
                 alive = [enemy for enemy in self.world.enemies if enemy.alive]
-                if not alive or self.player.hp <= 0:
+                if self.world.complete or self.player.hp <= 0:
                     break
+                if not alive:
+                    self.player.update((0, 0), 1 / 60, self.world.bounds)
+                    self.world.update(1 / 60)
+                    continue
                 target = min(alive, key=lambda enemy: enemy.position.distance_to(self.player.position))
                 delta = self.player.position - target.position
                 move = delta.normalize() if 0 < delta.length() < 105 else pygame.Vector2()
+                if target.is_boss and delta.length() > 0:
+                    normal = delta.normalize()
+                    move = normal if delta.length() < 80 else (-normal if delta.length() > 135 else pygame.Vector2(-normal.y, normal.x))
                 self.player.update(move, 1 / 60, self.world.bounds)
                 self.world.fire(target.position, 'basic')
                 self.world.fire(target.position, 'spear')
@@ -99,8 +109,8 @@ class WorldTests(unittest.TestCase):
                 self.world.update(1 / 60)
             self.assertTrue(self.world.complete, f'Sala {room} não foi concluída')
             self.assertGreater(self.player.hp, 0)
-            if room < 3:
-                self.world.apply_upgrade('vital')
+            if room < self.world.final_level:
+                self.world.apply_upgrade('power' if self.player.hp >= 80 else 'vital')
 
 
 if __name__ == '__main__':

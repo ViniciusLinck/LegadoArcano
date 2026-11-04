@@ -30,11 +30,13 @@ class Menu:
             self.heading_font = pygame.font.Font(str(path), 25)
             self.font = pygame.font.Font(str(path), 20)
             self.small_font = pygame.font.Font(str(path), 15)
+            self.tiny_font = pygame.font.Font(str(path), 10)
         except (OSError, pygame.error):
             self.title_font = pygame.font.Font(None, 48)
             self.heading_font = pygame.font.Font(None, 30)
             self.font = pygame.font.Font(None, 24)
             self.small_font = pygame.font.Font(None, 19)
+            self.tiny_font = pygame.font.Font(None, 14)
         self.upgrade_rects = [pygame.Rect(60 + i * 180, 132, 160, 105) for i in range(3)]
         self.pause_rects = [pygame.Rect(225, 125 + i * 42, 190, 34) for i in range(3)]
         self.end_rects = [pygame.Rect(205, 220, 110, 34), pygame.Rect(325, 220, 110, 34)]
@@ -101,8 +103,16 @@ class Menu:
         pygame.draw.rect(surface, (68, 29, 43), (14, 12, 122, 10))
         pygame.draw.rect(surface, (213, 78, 96), (14, 12, round(122 * player.hp / player.max_hp), 10))
         self.draw_text(surface, f'PV {int(player.hp)}/{player.max_hp}', (75, 30), self.small_font, WHITE)
-        self.draw_text(surface, world.ROOM_NAMES[world.room_index].upper(), (320, 19), self.small_font, WHITE)
-        if world.room_index < 3 and world.complete and world.chosen_upgrade:
+        label = world.ROOM_NAMES[world.room_index].upper()
+        if world.room_index:
+            label = f'NÍVEL {world.room_index}/10  •  {label}'
+        self.draw_text(surface, label, (320, 19), self.small_font, WHITE)
+        if world.room_index and not world.is_boss_room and not world.complete:
+            self.draw_text(surface, f'ONDA {world.wave_number}/{world.wave_count}', (320, 40), self.small_font, CYAN)
+            if world.wave_timer > 0:
+                self.panel(surface, (217, 155, 206, 38), True)
+                self.draw_text(surface, 'PRÓXIMA ONDA', (320, 174), self.font, WHITE)
+        if world.room_index < world.final_level and world.complete and world.chosen_upgrade:
             self.panel(surface, (493, 8, 139, 28), True)
             self.draw_text(surface, 'E  •  AVANÇAR', (562, 22), self.small_font, WHITE)
         if world.room_index == 0:
@@ -114,12 +124,13 @@ class Menu:
             remaining = player.cooldowns[key]
             self.draw_text(surface, f'{label}  {remaining:.1f}s' if remaining > 0 else f'{label}  OK',
                            rect.center, self.small_font, WHITE if remaining <= 0 else MUTED)
-        if world.room_index == 3 and world.enemies and world.enemies[0].alive:
+        if world.is_boss_room and world.enemies and world.enemies[0].alive:
             boss = world.enemies[0]
             pygame.draw.rect(surface, INK, (197, 42, 246, 12))
             pygame.draw.rect(surface, (100, 49, 67), (200, 45, 240, 6))
             pygame.draw.rect(surface, (221, 87, 112), (200, 45, round(240 * boss.hp / boss.max_hp), 6))
-            self.draw_text(surface, 'GUARDIÃO DO NÚCLEO', (320, 62), self.small_font, WHITE)
+            boss_name = 'GUARDIÃO DE PEDRA' if boss.kind == 'golem' else 'DRAGÃO DO NÚCLEO'
+            self.draw_text(surface, boss_name, (320, 62), self.small_font, WHITE)
 
     def draw_pause(self, surface, selected):
         self._overlay(surface)

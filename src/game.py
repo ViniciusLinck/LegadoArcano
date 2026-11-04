@@ -1,12 +1,13 @@
 """Window, input, game states and rendering for Arcane Trials."""
 
 from enum import Enum, auto
+import math
 
 import pygame
 
 from src import settings
 from src.assets import Sounds, resource_path
-from src.animation import mage_frame
+from src.animation import character_frame, creature_frame
 from src.player import Player
 from src.ui import Menu
 from src.world import World
@@ -41,6 +42,8 @@ class Game:
         self.tiles = self._load_tiles()
         self.floor_tiles = self._make_floor_tiles()
         self.mage_sheet = self._load_mage()
+        self.enemy_sheets = self._load_enemy_sheets()
+        self.dragon_parts = self._load_dragon_parts()
         self.pause_selected = 0
         self.boss_defeat_time = 0.0
         self.animation_time = 0.0
@@ -58,10 +61,31 @@ class Game:
 
     def _load_mage(self):
         try:
-            image = pygame.image.load(str(resource_path('assets', 'sprites', 'mage_saint11.png'))).convert_alpha()
-            return image if image.get_width() >= 128 and image.get_height() >= 32 else None
+            image = pygame.image.load(str(resource_path('assets', 'sprites', 'ninja-adventure', 'mago_laranja.png'))).convert_alpha()
+            return image if image.get_width() >= 64 and image.get_height() >= 112 else None
         except (FileNotFoundError, pygame.error, OSError):
             return None
+
+    def _load_enemy_sheets(self):
+        names = {'goblin': 'goblin.png', 'golem': 'golem.png', 'wizard': 'feiticeiro.png',
+                 'ninja': 'ninja.png', 'warrior': 'guerreiro.png', 'dragon': 'dragao.png'}
+        result = {}
+        for kind, filename in names.items():
+            try:
+                result[kind] = pygame.image.load(str(resource_path('assets', 'sprites', 'ninja-adventure', filename))).convert_alpha()
+            except (FileNotFoundError, pygame.error, OSError):
+                pass
+        return result
+
+    def _load_dragon_parts(self):
+        parts = {}
+        for part in ('head', 'wing', 'body1', 'body2', 'bodyend'):
+            try:
+                parts[part] = pygame.image.load(str(resource_path('assets', 'sprites', 'ninja-adventure',
+                                      f'dragao_chefe_{part}.png'))).convert_alpha()
+            except (FileNotFoundError, pygame.error, OSError):
+                return {}
+        return parts
 
     def _make_floor_tiles(self):
         if not self.tiles:
@@ -105,7 +129,7 @@ class Game:
             self.state = GameState.MENU
 
     def _advance(self):
-        if self.world.complete and self.world.chosen_upgrade and self.world.room_index < 3:
+        if self.world.complete and self.world.chosen_upgrade and self.world.room_index < self.world.final_level:
             self.next_room = self.world.room_index + 1
             self.room_loaded = False
             self.sequence_time = 0.0
@@ -232,9 +256,9 @@ class Game:
         self.world.update(dt)
         if self.player.hp <= 0:
             self.state = GameState.DEFEAT
-        elif self.world.complete and self.world.room_index in (1, 2) and not self.world.chosen_upgrade:
+        elif self.world.complete and self.world.room_index > 0 and not self.world.chosen_upgrade:
             self.state = GameState.UPGRADE
-        elif self.world.complete and self.world.room_index == 3:
+        elif self.world.complete and self.world.room_index == self.world.final_level:
             self.boss_defeat_time += dt
             if self.boss_defeat_time >= 1:
                 self.state = GameState.VICTORY
@@ -263,18 +287,32 @@ class Game:
             if not enemy.alive:
                 continue
             if enemy.windup > 0:
-                pygame.draw.circle(self.canvas, (235, 90, 60), enemy.position, 42 if enemy.kind == 'sentinel' else 28, 2)
-            colors = {'shadow': (139, 80, 166), 'cultist': (227, 141, 65), 'sentinel': (145, 150, 163), 'boss': (211, 71, 116)}
-            if self.tiles and enemy.hit_flash <= 0:
-                coords = {'shadow': (0, 144), 'cultist': (64, 144), 'sentinel': (0, 160), 'boss': (16, 160)}
-                sprite = self.tiles.subsurface((*coords[enemy.kind], 16, 16))
-                bob = int(enemy.windup <= 0 and (self.animation_time * 5 + enemy.position.x / 40) % 2 >= 1)
-                self.canvas.blit(pygame.transform.scale(sprite, enemy.rect.size), enemy.rect.move(0, -bob))
+                pygame.draw.circle(self.canvas, (235, 90, 60), enemy.position, 42 if enemy.kind == 'golem' and not enemy.is_boss else 28, 2)
+            colors = {'goblin': (92, 180, 95), 'wizard': (227, 141, 65), 'golem': (145, 150, 163),
+                      'ninja': (146, 113, 183), 'warrior': (186, 184, 155), 'dragon': (170, 210, 85)}
+            sheet = self.enemy_sheets.get(enemy.kind)
+            sprite_size = 58 if enemy.is_boss else (40 if enemy.kind in ('golem', 'dragon') else 32)
+            if enemy.is_boss and enemy.kind == 'dragon' and self.dragon_parts:
+                self._draw_dragon_boss(enemy)
+            elif sheet:
+                frame = creature_frame(enemy.kind, enemy.facing, enemy.animation_time,
+                                       enemy.windup > 0 or enemy.attacking_time > 0)
+                sprite = sheet.subsurface(frame)
+                if enemy.kind in ('goblin', 'golem') and enemy.facing.x < 0:
+                    sprite = pygame.transform.flip(sprite, True, False)
+                sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+                if enemy.hit_flash > 0:
+                    sprite.fill((80, 80, 80, 0), special_flags=pygame.BLEND_RGBA_ADD)
+                self.canvas.blit(sprite, sprite.get_rect(midbottom=enemy.rect.midbottom))
             else:
                 pygame.draw.ellipse(self.canvas, (255, 255, 255) if enemy.hit_flash else colors[enemy.kind], enemy.rect)
-            if enemy.kind != 'boss':
-                pygame.draw.rect(self.canvas, (30, 20, 30), (enemy.rect.left, enemy.rect.top - 5, enemy.size, 3))
-                pygame.draw.rect(self.canvas, (220, 80, 95), (enemy.rect.left, enemy.rect.top - 5, int(enemy.size * enemy.hp / enemy.max_hp), 3))
+            if not enemy.is_boss:
+                labels = {'goblin': 'GOBLIN', 'golem': 'GOLEM', 'wizard': 'FEITICEIRO',
+                          'ninja': 'NINJA', 'warrior': 'GUERREIRO', 'dragon': 'DRAGÃO'}
+                bar_y = enemy.rect.bottom - sprite_size - 4
+                self.menu.draw_text(self.canvas, labels[enemy.kind], (enemy.rect.centerx, bar_y - 7), self.menu.tiny_font, (235, 230, 218))
+                pygame.draw.rect(self.canvas, (30, 20, 30), (enemy.rect.left, bar_y, enemy.size, 3))
+                pygame.draw.rect(self.canvas, (220, 80, 95), (enemy.rect.left, bar_y, int(enemy.size * enemy.hp / enemy.max_hp), 3))
         for shot in self.world.projectiles:
             color = (255, 222, 120) if shot.friendly and shot.max_hits > 1 else ((102, 235, 250) if shot.friendly else (247, 101, 140))
             if shot.friendly and shot.max_hits > 1:
@@ -284,14 +322,14 @@ class Game:
         for pos, time, kind in self.world.effects:
             radius = int((0.35 - time) * 160) if kind == 'explosion' else (5 if kind == 'dash' else 9)
             pygame.draw.circle(self.canvas, (110, 235, 240) if kind != 'hazard' else (250, 100, 90), pos, max(2, radius), 2)
-        if self.world.room_index == 3 and self.world.complete:
+        if self.world.room_index == self.world.final_level and self.world.complete:
             center = (320, 160)
             pygame.draw.polygon(self.canvas, settings.ACCENT, [(320, 142), (332, 160), (320, 178), (308, 160)])
             pygame.draw.circle(self.canvas, settings.ACCENT, center, 20 + int(self.boss_defeat_time * 35), 2)
         pygame.draw.ellipse(self.canvas, (21, 28, 40), self.player.rect.move(0, 6))
         pygame.draw.ellipse(self.canvas, (80, 149, 157), self.player.rect.inflate(5, -5), 1)
         if self.mage_sheet and not (self.player.invulnerability > 0 and int(self.player.invulnerability * 12) % 2):
-            frame = mage_frame(self.player.facing, self.player.moving, self.animation_time)
+            frame = character_frame(self.player.facing, self.player.moving, self.animation_time, self.cast_time > 0)
             sprite = self.mage_sheet.subsurface(frame)
             sprite = pygame.transform.scale(sprite, (32, 32))
             self.canvas.blit(sprite, sprite.get_rect(midbottom=self.player.rect.midbottom))
@@ -301,6 +339,22 @@ class Game:
             radius = 11 + int((0.22 - min(0.22, self.cast_time)) * 38)
             pygame.draw.circle(self.canvas, (121, 222, 225), self.player.rect.center, radius, 1)
         self.menu.draw_hud(self.canvas, self.player, self.world)
+
+    def _draw_dragon_boss(self, enemy):
+        """Layer the original CC0 dragon pieces and animate the wings."""
+        x, y = enemy.position
+        wing = pygame.transform.scale(self.dragon_parts['wing'], (48, 48))
+        flap = math.sin(enemy.animation_time * 7) * 8
+        right = pygame.transform.rotate(wing, flap)
+        left = pygame.transform.flip(right, True, False)
+        self.canvas.blit(left, left.get_rect(center=(x - 32, y - 10)))
+        self.canvas.blit(right, right.get_rect(center=(x + 32, y - 10)))
+        for part, size, offset in (('bodyend', (28, 38), (0, 33)), ('body2', (28, 25), (0, 20)),
+                                   ('body1', (30, 26), (0, 8)), ('head', (46, 46), (0, -9))):
+            sprite = pygame.transform.scale(self.dragon_parts[part], size)
+            if enemy.hit_flash > 0:
+                sprite.fill((75, 75, 75, 0), special_flags=pygame.BLEND_RGBA_ADD)
+            self.canvas.blit(sprite, sprite.get_rect(center=(x + offset[0], y + offset[1])))
 
     def draw(self):
         if self.state == GameState.MENU:

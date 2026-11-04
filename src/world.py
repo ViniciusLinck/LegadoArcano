@@ -8,10 +8,25 @@ from src.enemy import Enemy
 
 
 class World:
-    ROOM_NAMES = ('Câmara Inicial', 'Salão Abandonado', 'Câmara Ritual', 'Câmara do Núcleo')
-    LAYOUTS = ((), (('shadow', (155, 95)), ('shadow', (485, 95)), ('shadow', (320, 245))),
-               (('cultist', (145, 95)), ('cultist', (485, 95)), ('shadow', (200, 240)),
-                ('shadow', (440, 240)), ('sentinel', (320, 90))), (('boss', (320, 110)),))
+    ROOM_NAMES = ('Câmara Inicial', 'Salão Abandonado', 'Galeria das Sombras', 'Câmara Ritual',
+                  'Salão da Forja', 'Guardião de Pedra', 'Corredor Ardente', 'Santuário dos Ecos',
+                  'Câmara Escarlate', 'Portões do Núcleo', 'Dragão do Núcleo')
+    final_level = 10
+    BOSS_LEVELS = (5, 10)
+    # Explicit, repeatable encounter plans. Every normal room contains two waves.
+    WAVE_KINDS = {
+        1: (('goblin', 'goblin', 'goblin'), ('goblin', 'goblin', 'warrior')),
+        2: (('warrior', 'goblin', 'ninja'), ('ninja', 'goblin', 'warrior')),
+        3: (('wizard', 'goblin', 'goblin'), ('wizard', 'warrior', 'ninja')),
+        4: (('golem', 'warrior', 'goblin'), ('golem', 'wizard', 'ninja')),
+        5: (('golem',),),
+        6: (('dragon', 'goblin', 'ninja'), ('dragon', 'warrior', 'wizard')),
+        7: (('golem', 'wizard', 'ninja'), ('dragon', 'goblin', 'warrior', 'ninja')),
+        8: (('dragon', 'dragon', 'goblin'), ('golem', 'wizard', 'wizard', 'ninja')),
+        9: (('golem', 'dragon', 'warrior'), ('dragon', 'wizard', 'ninja', 'goblin')),
+        10: (('dragon',),),
+    }
+    SPAWN_POINTS = ((155, 95), (485, 95), (320, 165), (195, 205))
 
     def __init__(self, player, bounds):
         self.player = player
@@ -25,18 +40,40 @@ class World:
         self.load_room(0)
 
     def load_room(self, index):
+        if not 0 <= index <= self.final_level:
+            raise ValueError('Nível inexistente')
         self.room_index = index
-        self.enemies = [Enemy(kind, position) for kind, position in self.LAYOUTS[index]]
+        self.waves = [tuple((kind, (320, 110) if self.is_boss_room else self.SPAWN_POINTS[i]) for i, kind in enumerate(wave))
+                      for wave in self.WAVE_KINDS.get(index, ())]
+        self.wave_number = 0
+        self.wave_timer = 0.0
+        self.enemies = []
+        if self.waves:
+            self._spawn_wave()
         self.projectiles = []
         self.effects = []
         self.hazards = []
-        self.chosen_upgrade = index in (0, 3)
+        self.chosen_upgrade = index in (0, self.final_level)
         self.player.position.update(self.bounds.centerx, self.bounds.bottom - 36)
         self.player.rect.center = self.player.position
 
     @property
     def complete(self):
-        return all(not enemy.alive for enemy in self.enemies)
+        return self.wave_number >= len(self.waves) and all(not enemy.alive for enemy in self.enemies)
+
+    @property
+    def is_boss_room(self):
+        return self.room_index in self.BOSS_LEVELS
+
+    @property
+    def wave_count(self):
+        return len(self.waves)
+
+    def _spawn_wave(self):
+        wave = self.waves[self.wave_number]
+        self.enemies = [Enemy(kind, position, boss=self.is_boss_room) for kind, position in wave]
+        self.wave_number += 1
+        self.wave_timer = 0.0
 
     def fire(self, target, kind):
         if not self.player.use_ability(kind):
@@ -60,7 +97,7 @@ class World:
                 enemy.take_damage(settings.EXPLOSION_DAMAGE * self.player.damage_multiplier)
                 if not enemy.alive:
                     self.effects.append([enemy.position.copy(), 0.35, 'death'])
-                if delta.length_squared() and enemy.kind != 'boss':
+                if delta.length_squared() and not enemy.is_boss:
                     enemy.position += delta.normalize() * 24
                     enemy.position.x = max(self.bounds.left + enemy.size / 2, min(self.bounds.right - enemy.size / 2, enemy.position.x))
                     enemy.position.y = max(self.bounds.top + enemy.size / 2, min(self.bounds.bottom - enemy.size / 2, enemy.position.y))
@@ -79,10 +116,14 @@ class World:
 
     def update(self, dt):
         self.effects = [[pos, time - dt, kind] for pos, time, kind in self.effects if time - dt > 0]
+        if self.wave_number < len(self.waves) and not any(enemy.alive for enemy in self.enemies):
+            self.wave_timer += dt
+            if self.wave_timer >= 0.8:
+                self._spawn_wave()
         for enemy in self.enemies:
             old_windup = enemy.windup
             self.projectiles.extend(enemy.update(dt, self.player, self.bounds))
-            if enemy.kind == 'boss' and enemy.alive and old_windup <= 0 < enemy.windup and enemy.pattern % 2:
+            if enemy.is_boss and enemy.alive and old_windup <= 0 < enemy.windup and enemy.pattern % 2:
                 self.hazards.append([self.player.position.copy(), enemy.windup + 0.3])
         living = [enemy for enemy in self.enemies if enemy.alive]
         for i, first in enumerate(living):
@@ -99,7 +140,7 @@ class World:
             half = enemy.size / 2
             enemy.position.x = max(self.bounds.left + half, min(self.bounds.right - half, enemy.position.x))
             enemy.position.y = max(self.bounds.top + half, min(self.bounds.bottom - half, enemy.position.y))
-        if self.room_index == 3 and self.complete:
+        if self.is_boss_room and self.complete:
             self.projectiles = [shot for shot in self.projectiles if shot.friendly]
             self.hazards = []
         remaining = []
@@ -123,6 +164,11 @@ class World:
                         self.effects.append([shot.position.copy(), 0.12, 'impact'])
                         if not enemy.alive:
                             self.effects.append([enemy.position.copy(), 0.35, 'death'])
+                            if self.is_boss_room and self.complete:
+                                self.hazards = []
+                                for other in self.projectiles:
+                                    if not other.friendly:
+                                        other.alive = False
                         if not shot.alive:
                             break
             elif shot.rect.colliderect(self.player.rect):
