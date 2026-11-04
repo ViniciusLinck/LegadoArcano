@@ -222,6 +222,10 @@ class Game:
         for pos, time, kind in self.world.effects:
             radius = int((0.35 - time) * 160) if kind == 'explosion' else (5 if kind == 'dash' else 9)
             pygame.draw.circle(self.canvas, (110, 235, 240) if kind != 'hazard' else (250, 100, 90), pos, max(2, radius), 2)
+        if self.world.room_index == 3 and self.world.complete:
+            center = (320, 160)
+            pygame.draw.polygon(self.canvas, settings.ACCENT, [(320, 142), (332, 160), (320, 178), (308, 160)])
+            pygame.draw.circle(self.canvas, settings.ACCENT, center, 20 + int(self.boss_defeat_time * 35), 2)
         if self.tiles and not (self.player.invulnerability > 0 and int(self.player.invulnerability * 12) % 2):
             sprite = self.tiles.subsurface((0, 112, 16, 16))
             sprite = pygame.transform.scale(sprite, self.player.rect.size)

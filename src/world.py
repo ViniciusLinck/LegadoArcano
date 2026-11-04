@@ -58,6 +58,8 @@ class World:
             delta = enemy.position - self.player.position
             if enemy.alive and delta.length() <= 68:
                 enemy.take_damage(settings.EXPLOSION_DAMAGE * self.player.damage_multiplier)
+                if not enemy.alive:
+                    self.effects.append([enemy.position.copy(), 0.35, 'death'])
                 if delta.length_squared() and enemy.kind != 'boss':
                     enemy.position += delta.normalize() * 24
                     enemy.position.x = max(self.bounds.left + enemy.size / 2, min(self.bounds.right - enemy.size / 2, enemy.position.x))
@@ -82,6 +84,21 @@ class World:
             self.projectiles.extend(enemy.update(dt, self.player, self.bounds))
             if enemy.kind == 'boss' and enemy.alive and old_windup <= 0 < enemy.windup and enemy.pattern % 2:
                 self.hazards.append([self.player.position.copy(), enemy.windup + 0.3])
+        living = [enemy for enemy in self.enemies if enemy.alive]
+        for i, first in enumerate(living):
+            for second in living[i + 1:]:
+                delta = second.position - first.position
+                distance = delta.length()
+                minimum = (first.size + second.size) * 0.4
+                if distance < minimum:
+                    normal = delta / distance if distance else pygame.Vector2(1, 0)
+                    correction = normal * min((minimum - distance) / 2, 35 * dt)
+                    first.position -= correction
+                    second.position += correction
+        for enemy in living:
+            half = enemy.size / 2
+            enemy.position.x = max(self.bounds.left + half, min(self.bounds.right - half, enemy.position.x))
+            enemy.position.y = max(self.bounds.top + half, min(self.bounds.bottom - half, enemy.position.y))
         if self.room_index == 3 and self.complete:
             self.projectiles = [shot for shot in self.projectiles if shot.friendly]
             self.hazards = []

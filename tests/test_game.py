@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import patch
 
 os.environ['SDL_VIDEODRIVER'] = 'dummy'
 os.environ['SDL_AUDIODRIVER'] = 'dummy'
@@ -7,6 +8,7 @@ os.environ['SDL_AUDIODRIVER'] = 'dummy'
 import pygame
 
 from src.game import Game, GameState
+from src.assets import Sounds
 
 
 class GameStateTests(unittest.TestCase):
@@ -116,3 +118,9 @@ class GameStateTests(unittest.TestCase):
         self.game.world.hazards.append([pygame.Vector2(320, 180), 0.5])
         self.game.world.fire((400, 100), 'spear')
         self.game.draw()
+
+    def test_audio_is_optional_when_mixer_unavailable(self):
+        with patch('pygame.mixer.get_init', return_value=None):
+            sounds = Sounds()
+            self.assertEqual(sounds.clips, {})
+            sounds.play('cast')
