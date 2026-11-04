@@ -1,0 +1,22 @@
+ARCANE TRIALS — AS PROVAÇÕES ARCANAS
+
+COMO INICIAR
+Extraia toda a pasta ArcaneTrials do arquivo ZIP. Dentro dela, abra
+ArcaneTrials.exe. Mantenha o executável junto aos demais arquivos e à pasta
+assets. Não é necessário instalar Python para executar esta distribuição.
+
+CONTROLES
+W, A, S e D: mover o mago.
+Mouse: mirar. Botão esquerdo: projétil arcano (segure para disparar).
+Botão direito: Lança de Raio. Q: Explosão Arcana. Espaço: esquiva.
+E: avançar quando a sala estiver liberada. Esc: pausar.
+No menu: mouse ou setas e Enter. Nas melhorias: clique ou teclas 1, 2 e 3.
+
+OBJETIVO
+Atravesse a câmara inicial, derrote os inimigos em duas arenas, escolha uma
+melhoria após cada arena e derrote o Guardião do Núcleo para purificar o
+cristal. Caso sua vida termine, escolha Reiniciar para tentar novamente.
+
+CRÉDITOS DE RECURSOS
+Tiny Dungeon e Interface Sounds por Kenney, licença CC0. As licenças e
+fontes dos arquivos estão nas pastas assets/sprites e assets/audio.
