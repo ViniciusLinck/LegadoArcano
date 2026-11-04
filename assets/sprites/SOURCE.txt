@@ -2,3 +2,7 @@ Tiny Dungeon 1.0, por Kenney — https://kenney.nl/assets/tiny-dungeon
 Licença: Creative Commons CC0 1.0. Arquivo obtido de espelho público:
 https://github.com/chaewonkong/tiny_dungeon/tree/main/assets/kenney_tiny-dungeon
 Licença original incluída em LICENSE-kenney.txt.
+
+16x16 Mage, por saint11 — https://opengameart.org/content/16x16-mage
+Arquivo mage_saint11.png; licença Creative Commons CC0 1.0:
+https://creativecommons.org/publicdomain/zero/1.0/
