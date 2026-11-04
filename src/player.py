@@ -17,6 +17,7 @@ class Player:
         self.dash_time = 0.0
         self.dash_direction = pygame.Vector2(1, 0)
         self.facing = pygame.Vector2(1, 0)
+        self.moving = False
         self.cooldowns = {'basic': 0.0, 'spear': 0.0, 'explosion': 0.0, 'dash': 0.0}
         self.damage_multiplier = 1.0
         self.cooldown_multiplier = 1.0
@@ -51,6 +52,7 @@ class Player:
             self.cooldowns[key] = max(0.0, self.cooldowns[key] - dt)
         self.invulnerability = max(0.0, self.invulnerability - dt)
         movement = pygame.Vector2(direction)
+        self.moving = bool(movement.length_squared())
         if movement.length_squared() > 0:
             movement = movement.normalize()
             self.facing = movement.copy()

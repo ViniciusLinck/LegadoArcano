@@ -20,6 +20,7 @@ class World:
         self.enemies = []
         self.projectiles = []
         self.effects = []
+        self.hazards = []
         self.chosen_upgrade = False
         self.load_room(0)
 
@@ -28,6 +29,7 @@ class World:
         self.enemies = [Enemy(kind, position) for kind, position in self.LAYOUTS[index]]
         self.projectiles = []
         self.effects = []
+        self.hazards = []
         self.chosen_upgrade = index in (0, 3)
         self.player.position.update(self.bounds.centerx, self.bounds.bottom - 36)
         self.player.rect.center = self.player.position
@@ -76,7 +78,23 @@ class World:
     def update(self, dt):
         self.effects = [[pos, time - dt, kind] for pos, time, kind in self.effects if time - dt > 0]
         for enemy in self.enemies:
+            old_windup = enemy.windup
             self.projectiles.extend(enemy.update(dt, self.player, self.bounds))
+            if enemy.kind == 'boss' and enemy.alive and old_windup <= 0 < enemy.windup and enemy.pattern % 2:
+                self.hazards.append([self.player.position.copy(), enemy.windup + 0.3])
+        if self.room_index == 3 and self.complete:
+            self.projectiles = [shot for shot in self.projectiles if shot.friendly]
+            self.hazards = []
+        remaining = []
+        for pos, timer in self.hazards:
+            timer -= dt
+            if timer <= 0:
+                if self.player.position.distance_to(pos) < 32:
+                    self.player.take_damage(18)
+                self.effects.append([pos, 0.25, 'hazard'])
+            else:
+                remaining.append([pos, timer])
+        self.hazards = remaining
         for shot in self.projectiles:
             shot.update(dt, self.bounds)
             if not shot.alive:
@@ -86,6 +104,8 @@ class World:
                     if enemy.alive and shot.rect.colliderect(enemy.rect) and shot.register_hit(enemy):
                         enemy.take_damage(shot.damage)
                         self.effects.append([shot.position.copy(), 0.12, 'impact'])
+                        if not enemy.alive:
+                            self.effects.append([enemy.position.copy(), 0.35, 'death'])
                         if not shot.alive:
                             break
             elif shot.rect.colliderect(self.player.rect):

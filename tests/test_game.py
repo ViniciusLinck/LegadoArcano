@@ -19,11 +19,14 @@ class GameStateTests(unittest.TestCase):
     def key(self, key):
         self.game.handle_event(pygame.event.Event(pygame.KEYDOWN, key=key))
 
-    def test_start_and_return_to_menu(self):
+    def test_start_pause_and_return_to_menu(self):
         self.assertEqual(self.game.state, GameState.MENU)
         self.key(pygame.K_RETURN)
         self.assertEqual(self.game.state, GameState.PLAYING)
         self.key(pygame.K_ESCAPE)
+        self.assertEqual(self.game.state, GameState.PAUSED)
+        self.game.pause_selected = 2
+        self.key(pygame.K_RETURN)
         self.assertEqual(self.game.state, GameState.MENU)
 
     def test_controls_screen_and_back(self):
@@ -67,3 +70,32 @@ class GameStateTests(unittest.TestCase):
         pygame.event.post(pygame.event.Event(pygame.QUIT))
         self.game.run()
         self.assertFalse(self.game.running)
+
+    def test_progression_upgrades_and_victory(self):
+        self.key(pygame.K_RETURN)
+        self.key(pygame.K_e)
+        self.assertEqual(self.game.world.room_index, 1)
+        self.key(pygame.K_e)
+        self.assertEqual(self.game.world.room_index, 1)
+        for enemy in self.game.world.enemies:
+            enemy.take_damage(1000)
+        self.game.update(0.01)
+        self.assertEqual(self.game.state, GameState.UPGRADE)
+        self.key(pygame.K_1)
+        self.assertEqual(self.game.state, GameState.PLAYING)
+        self.key(pygame.K_e)
+        self.assertEqual(self.game.world.room_index, 2)
+        self.game.world.load_room(3)
+        self.game.world.enemies[0].take_damage(1000)
+        self.game.update(1.1)
+        self.assertEqual(self.game.state, GameState.VICTORY)
+
+    def test_defeat_and_restart_reset_run(self):
+        self.key(pygame.K_RETURN)
+        self.game.player.hp = 0
+        self.game.update(0.01)
+        self.assertEqual(self.game.state, GameState.DEFEAT)
+        self.key(pygame.K_RETURN)
+        self.assertEqual(self.game.state, GameState.PLAYING)
+        self.assertEqual(self.game.player.hp, 100)
+        self.assertEqual(self.game.world.room_index, 0)
