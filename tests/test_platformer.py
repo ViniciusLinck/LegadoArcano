@@ -1,0 +1,88 @@
+import os
+import unittest
+os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
+os.environ.setdefault('SDL_AUDIODRIVER', 'dummy')
+import pygame
+from src.platformer import PlatformGame
+
+class PlatformDemoTest(unittest.TestCase):
+    def test_menu_options_and_restart_clear_combat_state(self):
+        game = PlatformGame()
+        game.selection = 1
+        game.choose()
+        self.assertEqual(game.state, 'options')
+        game.choose()
+        self.assertFalse(game.sound)
+        game.selection = 1
+        game.choose()
+        game.choose()
+        game.choose()
+        game.projectiles.append({'x': 1, 'y': 1, 'vx': 0, 'enemy': False, 'life': 1})
+        game.dash_cooldown = .9
+        game.reset()
+        self.assertEqual(game.projectiles, [])
+        self.assertEqual(game.dash_cooldown, 0)
+
+    def test_each_class_can_damage_boss(self):
+        for chosen in range(3):
+            with self.subTest(chosen=chosen):
+                game = PlatformGame()
+                game.class_index = chosen
+                game.level = 4
+                game.load_level()
+                game.state = 'play'
+                boss = game.enemies[0]
+                game.x = boss['x'] - (40 if chosen == 1 else 100)
+                game.y = boss['y'] + 40
+                original = boss['hp']
+                game.attack()
+                for _ in range(20):
+                    game.update(.02)
+                self.assertLess(boss['hp'], original)
+
+    def test_death_animation_and_paused_state(self):
+        game = PlatformGame()
+        game.state = 'play'
+        game.hp = 1
+        game.hurt_player(5)
+        self.assertEqual(game.state, 'dying')
+        game.update(.4)
+        game.draw()
+        self.assertEqual(game.state, 'dying')
+        game.update(.6)
+        self.assertEqual(game.state, 'defeat')
+        game.state = 'pause'
+        old_position = game.x
+        game.update(.5)
+        self.assertEqual(game.x, old_position)
+
+    def test_classes_levels_and_two_stage_boss(self):
+        game = PlatformGame()
+        game.choose()
+        self.assertEqual(game.state, 'classes')
+        game.selection = 2
+        game.choose()
+        self.assertEqual((game.state, game.class_index), ('play', 2))
+        game.update(.05)
+        self.assertTrue(game.grounded)
+        game.jump()
+        self.assertLess(game.vy, 0)
+        game.attack()
+        self.assertEqual(len(game.projectiles), 1)
+        for level in range(4):
+            game.enemies.clear()
+            game.x = game.width - 50
+            game.update(.01)
+            self.assertEqual(game.level, level + 1)
+        boss = game.enemies[0]
+        boss['hp'] = boss['maxhp'] / 2
+        boss['timer'] = 0
+        game.update(.01)
+        self.assertEqual(sum(p['enemy'] for p in game.projectiles), 3)
+        boss['hp'] = 0
+        game.update(.01)
+        self.assertEqual(game.state, 'victory')
+        game.draw()
+
+if __name__ == '__main__':
+    unittest.main()
