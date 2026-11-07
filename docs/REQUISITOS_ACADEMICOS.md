@@ -1,4 +1,4 @@
-﻿# Auditoria dos requisitos acadêmicos
+# Auditoria dos requisitos acadêmicos
 
 O PDF original não estava disponível no repositório ou anexos acessíveis. Esta lista verifica apenas os requisitos transcritos pelo usuário; a correspondência literal com o enunciado depende de conferir o PDF.
 

@@ -11,3 +11,7 @@ Para testar manualmente, execute `main.py` ou extraia o ZIP; navegue pelo menu, 
 - ZIP verificado quanto à integridade e presença do executável, instruções e pranchas necessárias.
 - ZIP extraído para uma pasta temporária fora do projeto; executável permaneceu aberto por cinco segundos com diretório de trabalho externo. Isso verifica inicialização, não uma partida completa.
 - Não foi realizada partida manual completa com cada classe nem teste em outro computador.
+
+## Atualização — inimigos e chefe
+
+A suíte completa passou com 64 testes em modo sem janela. Os testes adicionais verificaram comportamentos distintos dos três inimigos, preparação do golem, ondas do chefe e atraso da abertura do portal durante sua derrota. Não foi feita uma partida manual completa com cada classe nem teste em outro computador.

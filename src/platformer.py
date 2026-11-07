@@ -340,7 +340,8 @@ class PlatformGame:
                 if e['timer'] < .45:
                     warning = pygame.Surface((W, 18), pygame.SRCALPHA)
                     warning.fill((255, 75, 75, 80 if int(self.time*12)%2 else 35))
-                    self.screen.blit(warning, (0, int(e['y']+36)))
+                    warning_y = FLOOR-18 if e['attack_count'] % 2 else int(e['y']+36)
+                    self.screen.blit(warning, (0, warning_y))
                 if e['hp'] <= 0:
                     progress = min(1., e['dead_time']/1.2)
                     self.draw_art(self.art['mobs'][3][0], (150, max(4, int(135*(1-progress)))), x-35, FLOOR-max(4,int(135*(1-progress))), e['dir']<0)
