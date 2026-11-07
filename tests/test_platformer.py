@@ -84,6 +84,40 @@ class PlatformDemoTest(unittest.TestCase):
         game.event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_r))
         self.assertEqual((game.state, game.level, game.hp), ('play', 0, game.max_hp))
 
+    def test_enemy_types_have_distinct_behavior_and_telegraph(self):
+        game = PlatformGame()
+        game.state = 'play'
+        self.assertEqual({e['kind'] for e in game.enemies}, {'goblin', 'ninja', 'golem'})
+        speeds = []
+        for kind in ('goblin', 'ninja', 'golem'):
+            enemy = game.enemy(200, kind=kind)
+            game.x = 100
+            game.update_enemy(enemy, .1)
+            speeds.append(200 - enemy['x'])
+        self.assertGreater(speeds[1], speeds[0])
+        self.assertGreater(speeds[0], speeds[2])
+        golem = game.enemy(120, kind='golem')
+        game.update_enemy(golem, .01)
+        self.assertEqual(golem['mode'], 'windup')
+        self.assertGreater(golem['mode_time'], .5)
+
+    def test_boss_ground_attack_and_death_delay(self):
+        game = PlatformGame()
+        game.level = 4
+        game.load_level()
+        game.state = 'play'
+        boss = game.enemies[0]
+        boss['attack_count'] = 1
+        boss['timer'] = 0
+        game.update(.01)
+        self.assertEqual(len(game.shockwaves), 2)
+        boss['hp'] = 0
+        game.update(.1)
+        self.assertFalse(game.boss_defeated)
+        game.draw()
+        game.update(1.2)
+        self.assertTrue(game.boss_defeated)
+
     def test_classes_levels_and_two_stage_boss(self):
         game = PlatformGame()
         game.choose()
@@ -109,6 +143,8 @@ class PlatformDemoTest(unittest.TestCase):
         self.assertEqual(sum(p['enemy'] for p in game.projectiles), 3)
         boss['hp'] = 0
         game.update(.01)
+        self.assertFalse(game.boss_defeated)
+        game.update(1.2)
         self.assertTrue(game.boss_defeated)
         self.assertEqual(game.state, 'play')
         game.x = game.width - 50
