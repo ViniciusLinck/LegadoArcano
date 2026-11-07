@@ -1,0 +1,9 @@
+Pixel Explosion, por CptDrunkBear, licença CC0 1.0.
+Origem: https://opengameart.org/content/pixel-explosion
+Arquivos explosion_00.png a explosion_14.png, preservados do pacote original.
+
+2D Dungeon Platformer Tileset [16x16], por RottingPixels, licença CC0 1.0.
+Origem: https://opengameart.org/content/2d-dungeon-platformer-tileset-16x16
+Arquivo dungeon_tiles.png é o tileset.png original, com nome ajustado.
+
+Licença: https://creativecommons.org/publicdomain/zero/1.0/
