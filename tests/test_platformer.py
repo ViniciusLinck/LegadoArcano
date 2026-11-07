@@ -56,6 +56,34 @@ class PlatformDemoTest(unittest.TestCase):
         game.update(.5)
         self.assertEqual(game.x, old_position)
 
+    def test_special_cooldown_and_piercing_arrow(self):
+        game = PlatformGame()
+        game.state = 'play'
+        game.class_index = 2
+        game.special()
+        self.assertGreater(game.special_cooldown, 0)
+        self.assertTrue(game.projectiles[0]['pierce'])
+        game.special()
+        self.assertEqual(len(game.projectiles), 1)
+        game.state = 'pause'
+        before = game.special_cooldown
+        game.update(.5)
+        self.assertEqual(game.special_cooldown, before)
+
+    def test_trap_damage_and_restart_from_defeat(self):
+        game = PlatformGame()
+        game.level = 1
+        game.load_level()
+        game.state = 'play'
+        game.x = game.hazards[0].x
+        game.y = 422
+        original = game.hp
+        game.update(.01)
+        self.assertLess(game.hp, original)
+        game.state = 'defeat'
+        game.event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_r))
+        self.assertEqual((game.state, game.level, game.hp), ('play', 0, game.max_hp))
+
     def test_classes_levels_and_two_stage_boss(self):
         game = PlatformGame()
         game.choose()
@@ -80,6 +108,10 @@ class PlatformDemoTest(unittest.TestCase):
         game.update(.01)
         self.assertEqual(sum(p['enemy'] for p in game.projectiles), 3)
         boss['hp'] = 0
+        game.update(.01)
+        self.assertTrue(game.boss_defeated)
+        self.assertEqual(game.state, 'play')
+        game.x = game.width - 50
         game.update(.01)
         self.assertEqual(game.state, 'victory')
         game.draw()

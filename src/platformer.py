@@ -36,7 +36,8 @@ class PlatformGame:
 
     def reset(self):
         self.level = 0
-        self.hp = 100
+        self.max_hp = (90, 130, 100)[self.class_index]
+        self.hp = self.max_hp
         self.load_level()
 
     def load_level(self):
@@ -44,6 +45,9 @@ class PlatformGame:
         self.grounded, self.facing = False, 1
         self.attack_timer = self.dash_timer = self.cooldown = self.hurt = 0.
         self.dash_cooldown = 0.
+        self.special_cooldown = 0.
+        self.special_time = 0.
+        self.boss_defeated = False
         self.action = 'idle'
         self.action_time = 0.
         self.death_time = 0.
@@ -51,6 +55,7 @@ class PlatformGame:
         self.projectiles, self.particles = [], []
         self.width = 1800 if self.level < 4 else 960
         self.platforms = [pygame.Rect(0, FLOOR, self.width, 70)]
+        self.hazards = [pygame.Rect(x, FLOOR-14, 50, 14) for x in (710, 1230)] if 0 < self.level < 4 else []
         if self.level < 4:
             layouts = (
                 ((290,380,140),(550,315,120),(850,390,150),(1130,330,140),(1450,380,130)),
@@ -93,6 +98,25 @@ class PlatformGame:
         else:
             self.projectiles.append({'x': self.x + 15, 'y': self.y + 23, 'vx': self.facing * (520 if self.class_index == 2 else 400), 'enemy': False, 'life': 1.3})
 
+    def special(self):
+        if self.state != 'play' or self.special_cooldown > 0:
+            return
+        self.special_cooldown = 4.0
+        self.special_time = .4
+        self.attack_timer = .3
+        if self.sound: self.sounds.play('cast')
+        if self.class_index == 2:
+            self.projectiles.append({'x': self.x + 15, 'y': self.y + 23,
+                                     'vx': self.facing * 650, 'enemy': False,
+                                     'life': 1.8, 'damage': 32, 'pierce': True, 'hit': set()})
+        else:
+            radius = 155 if self.class_index == 0 else 100
+            area = pygame.Rect(self.x-radius, self.y-60, radius*2+30, 160)
+            for enemy in self.enemies:
+                if area.colliderect(self.enemy_rect(enemy)):
+                    self.damage_enemy(enemy, 32 if self.class_index == 0 else 42)
+            self.burst(self.x+15, self.y+20, COLORS[self.class_index], 24)
+
     def damage_enemy(self, e, amount):
         if self.sound: self.sounds.play("impact")
         e['hp'] -= amount
@@ -122,6 +146,9 @@ class PlatformGame:
         self.banner = max(0, self.banner-dt)
         self.hurt = max(0, self.hurt-dt)
         self.cooldown = max(0, self.cooldown-dt)
+        self.special_cooldown = max(0, self.special_cooldown-dt)
+        self.special_time = max(0, self.special_time-dt)
+        self.dash_cooldown = max(0, self.dash_cooldown-dt)
         self.attack_timer = max(0, self.attack_timer-dt)
         self.dash_timer = max(0, self.dash_timer-dt)
         keys = pygame.key.get_pressed()
@@ -137,12 +164,15 @@ class PlatformGame:
             if self.vy >= 0 and previous_bottom <= p.top and self.y + 48 >= p.top and self.x + 30 > p.left and self.x < p.right:
                 self.y, self.vy, self.grounded = float(p.top-48), 0., True
         self.camera = max(0, min(self.width-W, self.x-W*.35))
+        if any(self.rect().colliderect(hazard) for hazard in self.hazards):
+            self.hurt_player(12)
+            if self.state != 'play': return
         for e in self.enemies[:]:
             e['flash'] = max(0, e['flash']-dt)
             if e['hp'] <= 0:
                 self.burst(e['x']+20, e['y']+20, (255, 170, 90), 25)
                 self.enemies.remove(e)
-                if e['boss']: self.state = 'victory'
+                if e['boss']: self.boss_defeated = True
                 continue
             e['dir'] = -1 if self.x < e['x'] else 1
             distance = abs(self.x - e['x'])
@@ -166,16 +196,23 @@ class PlatformGame:
                 self.hurt_player(12); p['life'] = 0
             elif not p['enemy']:
                 for e in self.enemies:
-                    if box.colliderect(self.enemy_rect(e)):
-                        self.damage_enemy(e, 18 if self.class_index == 0 else 15); p['life'] = 0; break
+                    if box.colliderect(self.enemy_rect(e)) and id(e) not in p.get('hit', set()):
+                        self.damage_enemy(e, p.get('damage', 18 if self.class_index == 0 else 15))
+                        if p.get('pierce'):
+                            p['hit'].add(id(e))
+                        else:
+                            p['life'] = 0
+                            break
             if p['life'] <= 0 or p['x'] < 0 or p['x'] > self.width: self.projectiles.remove(p)
         for p in self.particles[:]:
             p[0] += p[2]*dt; p[1] += p[3]*dt; p[3] += 200*dt; p[4] -= dt
             if p[4] <= 0: self.particles.remove(p)
         if self.level < 4 and self.x > self.width-85 and not self.enemies:
             self.level += 1
-            self.hp = min(100, self.hp + 20)
+            self.hp = min(self.max_hp, self.hp + 20)
             self.load_level()
+        elif self.level == 4 and self.boss_defeated and self.x > self.width-85:
+            self.state = 'victory'
 
     def text(self, value, x, y, color=(240, 222, 191), font=None, center=True):
         surface = (font or self.font).render(value, True, color)
@@ -213,19 +250,28 @@ class PlatformGame:
             if self.state == 'menu':
                 self.text('UMA AVENTURA DE PLATAFORMA', W//2, 157, font=self.small)
                 self.buttons(('Jogar', 'Opções', 'Sair'))
+                self.text('A/D ou setas: mover | Espaço/W: pular | J/Z: atacar', W//2, 438, font=self.small)
+                self.text('K: especial | Shift: esquiva | Esc: pausa | Enter: confirmar', W//2, 464, font=self.small)
+                self.text('R: reiniciar | M: menu | Mouse ou setas: navegar', W//2, 490, font=self.small)
             elif self.state == 'options':
                 self.buttons(('Som: ' + ('Ligado' if self.sound else 'Desligado'), 'Voltar'))
                 self.text('A/D: mover   Espaço: pular   J: atacar   Shift: esquiva', W//2, 440, font=self.small)
             else:
                 self.text('Escolha sua classe', W//2, 175)
                 self.buttons(CLASSES + ('Voltar',))
+                descriptions = ('Magia a média distância - explosão arcana', 'Espada corpo a corpo - golpe pesado', 'Flechas rápidas - disparo perfurante', '')
+                self.text(descriptions[self.selection], W//2, 480, font=self.small)
             pygame.display.flip(); return
         for p in self.platforms:
             r = p.move(-self.camera, 0)
             pygame.draw.rect(self.screen, (54,48,62), r)
             pygame.draw.rect(self.screen, (131,115,128), (r.x,r.y,r.w,6))
             for x in range(r.x, r.right, 48): pygame.draw.line(self.screen, (77,67,80), (x,r.y+8), (x,r.bottom), 2)
-        if self.level < 4:
+        for hazard in self.hazards:
+            x = hazard.x-self.camera
+            for offset in range(0, hazard.width, 10):
+                pygame.draw.polygon(self.screen, (214, 197, 205), [(x+offset,FLOOR),(x+offset+5,FLOOR-14),(x+offset+10,FLOOR)])
+        if self.level < 4 or self.boss_defeated:
             x = self.width-60-self.camera
             pygame.draw.ellipse(self.screen, (111, 77, 180) if not self.enemies else (65,57,78), (x, FLOOR-95, 45, 95), 5)
         for e in self.enemies:
@@ -267,15 +313,17 @@ class PlatformGame:
             pygame.draw.circle(self.screen, (255,245,218), (int(p['x']-self.camera),int(p['y'])), 3)
         for p in self.particles: pygame.draw.circle(self.screen, p[5], (int(p[0]-self.camera), int(p[1])), max(1,int(p[4]*8)))
         pygame.draw.rect(self.screen, (50,27,39), (20,20,204,20))
-        pygame.draw.rect(self.screen, (212,75,90), (22,22,max(0,int(self.hp*2)),16))
+        pygame.draw.rect(self.screen, (212,75,90), (22,22,max(0,int(self.hp/self.max_hp*200)),16))
+        self.text(f'{self.hp}/{self.max_hp}', 120, 30, font=self.small)
+        self.text('Especial: pronto' if self.special_cooldown <= 0 else f'Especial: {self.special_cooldown:.1f}s', 20, 72, font=self.small, center=False)
         self.text(CLASSES[self.class_index] + '  •  ' + NAMES[self.level], 20, 47, font=self.small, center=False)
         if self.level < 4: self.text('Inimigos: ' + str(len(self.enemies)), W-100, 30, font=self.small)
-        self.text('A/D mover  ?  ESPA?O pular  ?  J atacar  ?  SHIFT esquivar', W//2, H-18, font=self.small)
+        self.text('A/D mover | ESPAÇO pular | J atacar | K especial | SHIFT esquivar', W//2, H-18, font=self.small)
         if self.banner: self.text(NAMES[self.level], W//2, 105, (255,215,156), self.big)
         if self.state in ('pause','victory','defeat'):
             overlay = pygame.Surface((W,H), pygame.SRCALPHA); overlay.fill((8,8,20,200)); self.screen.blit(overlay,(0,0))
             self.text({'pause':'Pausado','victory':'Vitória!','defeat':'Fim de jogo'}[self.state], W//2, 190, font=self.big)
-            self.text('Enter: continuar' if self.state == 'pause' else 'Enter: voltar ao menu', W//2, 280)
+            self.text('Enter: continuar  |  R: reiniciar  |  M: menu' if self.state == 'pause' else 'R: reiniciar  |  Enter: menu', W//2, 280, font=self.small)
         pygame.display.flip()
 
     def buttons(self, labels):
@@ -313,17 +361,20 @@ class PlatformGame:
             if self.state == 'play':
                 if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP): self.jump()
                 elif event.key in (pygame.K_j, pygame.K_z): self.attack()
+                elif event.key == pygame.K_k: self.special()
                 elif event.key in (pygame.K_LSHIFT, pygame.K_RSHIFT):
                     if self.dash_timer <= 0 and not getattr(self,'dash_cooldown',0): self.dash_timer=.16; self.dash_cooldown=1.0
                 elif event.key == pygame.K_ESCAPE: self.state='pause'
-            elif event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
-                if self.state == 'pause': self.state='play'
-                else: self.state='menu'; self.selection=0
+            elif self.state in ('pause', 'defeat', 'victory'):
+                if event.key == pygame.K_r: self.reset(); self.state = 'play'
+                elif event.key == pygame.K_m: self.state = 'menu'; self.selection = 0
+                elif event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+                    if self.state == 'pause': self.state='play'
+                    else: self.state='menu'; self.selection=0
 
     def run(self):
         while self.running:
             dt = min(self.clock.tick(60)/1000, .05)
-            self.dash_cooldown = max(0, getattr(self,'dash_cooldown',0)-dt)
             for event in pygame.event.get(): self.event(event)
             self.update(dt); self.draw()
         pygame.quit()

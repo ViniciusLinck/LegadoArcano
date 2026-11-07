@@ -1,5 +1,6 @@
-﻿"""Extract animation frames from the supplied reference sheets at runtime."""
+"""Extract animation frames from the supplied reference sheets at runtime."""
 from collections import deque
+from functools import lru_cache
 import pygame
 from src.assets import resource_path
 
@@ -21,6 +22,7 @@ def cut(sheet, box, dark=28):
     return image
 
 
+@lru_cache(maxsize=1)
 def load_art():
     classes = pygame.image.load(str(resource_path('assets','effects','Animações classes.png'))).convert_alpha()
     enemies = pygame.image.load(str(resource_path('assets','sprites','Mobs - Boss.png'))).convert_alpha()
