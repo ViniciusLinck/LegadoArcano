@@ -250,13 +250,16 @@ class PlatformGame:
             if self.state == 'menu':
                 self.text('UMA AVENTURA DE PLATAFORMA', W//2, 157, font=self.small)
                 self.buttons(('Jogar', 'Opções', 'Sair'))
+                self.text('A/D ou setas: mover | Espaço/W: pular | J/Z: atacar', W//2, 438, font=self.small)
+                self.text('K: especial | Shift: esquiva | Esc: pausa | Enter: confirmar', W//2, 464, font=self.small)
+                self.text('R: reiniciar | M: menu | Mouse ou setas: navegar', W//2, 490, font=self.small)
             elif self.state == 'options':
                 self.buttons(('Som: ' + ('Ligado' if self.sound else 'Desligado'), 'Voltar'))
                 self.text('A/D: mover   Espaço: pular   J: atacar   Shift: esquiva', W//2, 440, font=self.small)
             else:
                 self.text('Escolha sua classe', W//2, 175)
                 self.buttons(CLASSES + ('Voltar',))
-                descriptions = ('Magia a m?dia dist?ncia ? explos?o arcana', 'Espada corpo a corpo ? golpe pesado', 'Flechas r?pidas ? disparo perfurante', '')
+                descriptions = ('Magia a média distância - explosão arcana', 'Espada corpo a corpo - golpe pesado', 'Flechas rápidas - disparo perfurante', '')
                 self.text(descriptions[self.selection], W//2, 480, font=self.small)
             pygame.display.flip(); return
         for p in self.platforms:
@@ -315,7 +318,7 @@ class PlatformGame:
         self.text('Especial: pronto' if self.special_cooldown <= 0 else f'Especial: {self.special_cooldown:.1f}s', 20, 72, font=self.small, center=False)
         self.text(CLASSES[self.class_index] + '  •  ' + NAMES[self.level], 20, 47, font=self.small, center=False)
         if self.level < 4: self.text('Inimigos: ' + str(len(self.enemies)), W-100, 30, font=self.small)
-        self.text('A/D mover  ?  ESPA?O pular  ?  J atacar  ?  K especial  ?  SHIFT esquivar', W//2, H-18, font=self.small)
+        self.text('A/D mover | ESPAÇO pular | J atacar | K especial | SHIFT esquivar', W//2, H-18, font=self.small)
         if self.banner: self.text(NAMES[self.level], W//2, 105, (255,215,156), self.big)
         if self.state in ('pause','victory','defeat'):
             overlay = pygame.Surface((W,H), pygame.SRCALPHA); overlay.fill((8,8,20,200)); self.screen.blit(overlay,(0,0))
