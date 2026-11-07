@@ -22,6 +22,16 @@ def cut(sheet, box, dark=28):
     return image
 
 
+def align_actor(image):
+    """Keep a stable foot anchor across the uneven frames in the concept sheet."""
+    bounds = image.get_bounding_rect(min_alpha=1)
+    canvas = pygame.Surface((76, 94), pygame.SRCALPHA)
+    if bounds.width and bounds.height:
+        part = image.subsurface(bounds)
+        canvas.blit(part, ((canvas.get_width()-bounds.width)//2, canvas.get_height()-bounds.height))
+    return canvas
+
+
 @lru_cache(maxsize=1)
 def load_art():
     classes = pygame.image.load(str(resource_path('assets','effects','Animações classes.png'))).convert_alpha()
@@ -43,7 +53,7 @@ def load_art():
     rows = [(241,331), (453,545), (675,769)]
     actors = []
     for y0,y1 in rows:
-        actors.append({name:[cut(classes,(x0,y0,x1-x0,y1-y0),32) for x0,x1 in spans] for name,spans in ranges.items()})
+        actors.append({name:[align_actor(cut(classes,(x0,y0,x1-x0,y1-y0),32)) for x0,x1 in spans] for name,spans in ranges.items()})
     # Background previews are complete painted scenes; they are not tile atlases.
     scene_boxes = [(15,114,258,158), (282,114,230,158), (524,114,245,158), (782,114,247,158), (1046,114,229,158)]
     scenes = [pygame.transform.scale(maps.subsurface(pygame.Rect(b)), (960,540)) for b in scene_boxes]
