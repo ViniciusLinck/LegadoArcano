@@ -15,3 +15,7 @@ Para testar manualmente, execute `main.py` ou extraia o ZIP; navegue pelo menu, 
 ## Atualização — inimigos e chefe
 
 A suíte completa passou com 64 testes em modo sem janela. Os testes adicionais verificaram comportamentos distintos dos três inimigos, preparação do golem, ondas do chefe e atraso da abertura do portal durante sua derrota. Não foi feita uma partida manual completa com cada classe nem teste em outro computador.
+
+## Atualização — animações e ataques
+
+A suíte completa passou com 71 testes em modo sem janela. Há testes para transparência da explosão, tempo dos efeitos, golpe do cavaleiro e ataques de goblin, ninja e golem. A cena do efeito e das plataformas foi inspecionada em uma captura; ainda é necessária uma partida manual completa para avaliar ritmo e balanceamento.

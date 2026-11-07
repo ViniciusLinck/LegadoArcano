@@ -20,6 +20,8 @@ A/D move, W pula e S desce de plataformas elevadas. As setas também funcionam, 
 
 O mago lança projéteis e uma explosão, o cavaleiro usa espada e golpe pesado e o arqueiro dispara flechas e um disparo perfurante. Especiais possuem recarga. Espinhos e inimigos causam dano; goblins, ninjas e golens têm velocidades e ataques diferentes. O chefe alterna projéteis e ondas no chão. A barra mostra a vida. Ao zerá-la, a partida termina.
 
+Os goblins também lançam projéteis, os ninjas preparam investidas e os golens produzem ondas no chão. Observe os avisos e use pulo ou esquiva para reagir.
+
 ## Distribuição Windows
 
 ```powershell

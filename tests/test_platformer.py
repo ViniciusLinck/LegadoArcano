@@ -6,6 +6,50 @@ import pygame
 from src.platformer import PlatformGame
 
 class PlatformDemoTest(unittest.TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        pygame.quit()
+
+    def test_enemy_unique_attacks_and_effect_lifetime(self):
+        game = PlatformGame()
+        self.assertTrue(all(frame.get_at((0, 0)).a == 0 for frame in game.explosion_frames))
+        game.state = 'play'
+        game.x = 100
+        for kind in ('goblin', 'ninja', 'golem'):
+            enemy = game.enemy(220, kind=kind)
+            enemy['special_cd'] = 0
+            game.update_enemy(enemy, .01)
+            if kind == 'goblin':
+                self.assertTrue(any(p.get('style') == 'goblin' for p in game.projectiles))
+            elif kind == 'ninja':
+                self.assertEqual(enemy['mode'], 'charge_windup')
+                game.update_enemy(enemy, .4)
+                self.assertEqual(enemy['mode'], 'charge')
+            else:
+                self.assertEqual(enemy['mode'], 'ground_windup')
+                game.update_enemy(enemy, .7)
+                self.assertEqual(len(game.shockwaves), 2)
+        game.enemies.clear()
+        game.visual_effects.clear()
+        game.spawn_effect('impact', 100, 100, .2, 55)
+        game.update(.1)
+        self.assertEqual(len(game.visual_effects), 1)
+        game.update(.11)
+        self.assertEqual(len(game.visual_effects), 0)
+
+    def test_knight_attack_hits_only_during_swing(self):
+        game = PlatformGame()
+        game.state, game.class_index, game.x = 'play', 1, 100
+        game.enemies = [game.enemy(145)]
+        enemy = game.enemies[0]
+        enemy['special_cd'] = 99
+        game.attack()
+        self.assertEqual(enemy['hp'], enemy['maxhp'])
+        game.update(.11)
+        self.assertEqual(enemy['hp'], enemy['maxhp'] - 25)
+        game.update(.05)
+        self.assertEqual(enemy['hp'], enemy['maxhp'] - 25)
+
     def test_jump_lands_on_first_platform_in_every_level(self):
         game = PlatformGame()
         game.state = 'play'
