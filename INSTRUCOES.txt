@@ -4,7 +4,7 @@ Extraia a pasta inteira e abra LegadoArcano.exe. Mantenha a pasta assets
 junto ao executável. O jogo não necessita de Python instalado.
 
 CONTROLES
-A/D ou setas: mover; Espaço/W/seta para cima: pular; J/Z: ataque;
+A/D: mover; W: pular; S: descer de plataformas elevadas; J/Z: ataque;
 K: habilidade especial; Shift: esquiva; Esc: pausa; Enter: confirmar.
 Na pausa: Enter continua, R reinicia e M volta ao menu. Na derrota ou
 vitória: R reinicia e Enter volta ao menu. O menu também aceita mouse.

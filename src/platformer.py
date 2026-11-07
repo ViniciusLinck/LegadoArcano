@@ -43,6 +43,7 @@ class PlatformGame:
     def load_level(self):
         self.x, self.y, self.vy = 80., float(FLOOR - 48), 0.
         self.grounded, self.facing = False, 1
+        self.drop_platform = None
         self.attack_timer = self.dash_timer = self.cooldown = self.hurt = 0.
         self.dash_cooldown = 0.
         self.special_cooldown = 0.
@@ -122,6 +123,18 @@ class PlatformGame:
             self.grounded = False
             self.burst(self.x + 15, self.y + 48, (180, 169, 166), 5)
 
+    def drop(self):
+        if not self.grounded:
+            return
+        feet = self.y + self.rect().height
+        for platform in self.platforms[1:]:
+            if abs(feet - platform.top) <= 1 and self.rect().right > platform.left and self.rect().left < platform.right:
+                self.drop_platform = platform
+                self.grounded = False
+                self.y += 2
+                self.vy = max(self.vy, 40)
+                break
+
     def attack(self):
         if self.cooldown > 0: return
         if self.sound: self.sounds.play("cast")
@@ -196,7 +209,11 @@ class PlatformGame:
         self.vy = min(850, self.vy + 1250 * dt)
         self.y += self.vy * dt
         self.grounded = False
+        if self.drop_platform is not None and self.y >= self.drop_platform.bottom:
+            self.drop_platform = None
         for p in self.platforms:
+            if p is self.drop_platform:
+                continue
             if self.vy >= 0 and previous_bottom <= p.top and self.y + 48 >= p.top and self.x + 30 > p.left and self.x < p.right:
                 self.y, self.vy, self.grounded = float(p.top-48), 0., True
         self.camera = max(0, min(self.width-W, self.x-W*.35))
@@ -309,12 +326,12 @@ class PlatformGame:
             if self.state == 'menu':
                 self.text('UMA AVENTURA DE PLATAFORMA', W//2, 157, font=self.small)
                 self.buttons(('Jogar', 'Opções', 'Sair'))
-                self.text('A/D ou setas: mover | Espaço/W: pular | J/Z: atacar', W//2, 438, font=self.small)
+                self.text('A/D: mover | W: pular | S: descer | J: atacar', W//2, 438, font=self.small)
                 self.text('K: especial | Shift: esquiva | Esc: pausa | Enter: confirmar', W//2, 464, font=self.small)
                 self.text('R: reiniciar | M: menu | Mouse ou setas: navegar', W//2, 490, font=self.small)
             elif self.state == 'options':
                 self.buttons(('Som: ' + ('Ligado' if self.sound else 'Desligado'), 'Voltar'))
-                self.text('A/D: mover   Espaço: pular   J: atacar   Shift: esquiva', W//2, 440, font=self.small)
+                self.text('A/D: mover | W: pular | S: descer | J: atacar', W//2, 440, font=self.small)
             else:
                 self.text('Escolha sua classe', W//2, 175)
                 self.buttons(CLASSES + ('Voltar',))
@@ -390,7 +407,7 @@ class PlatformGame:
         self.text('Especial: pronto' if self.special_cooldown <= 0 else f'Especial: {self.special_cooldown:.1f}s', 20, 72, font=self.small, center=False)
         self.text(CLASSES[self.class_index] + '  •  ' + NAMES[self.level], 20, 47, font=self.small, center=False)
         if self.level < 4: self.text('Inimigos: ' + str(len(self.enemies)), W-100, 30, font=self.small)
-        self.text('A/D mover | ESPAÇO pular | J atacar | K especial | SHIFT esquivar', W//2, H-18, font=self.small)
+        self.text('A/D mover | W pular | S descer | J atacar | K especial | SHIFT esquivar', W//2, H-18, font=self.small)
         if self.banner: self.text(NAMES[self.level], W//2, 105, (255,215,156), self.big)
         if self.state in ('pause','victory','defeat'):
             overlay = pygame.Surface((W,H), pygame.SRCALPHA); overlay.fill((8,8,20,200)); self.screen.blit(overlay,(0,0))
@@ -432,6 +449,7 @@ class PlatformGame:
         elif event.type == pygame.KEYDOWN:
             if self.state == 'play':
                 if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP): self.jump()
+                elif event.key in (pygame.K_s, pygame.K_DOWN): self.drop()
                 elif event.key in (pygame.K_j, pygame.K_z): self.attack()
                 elif event.key == pygame.K_k: self.special()
                 elif event.key in (pygame.K_LSHIFT, pygame.K_RSHIFT):

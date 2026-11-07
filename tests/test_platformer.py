@@ -6,6 +6,28 @@ import pygame
 from src.platformer import PlatformGame
 
 class PlatformDemoTest(unittest.TestCase):
+    def test_wasd_jump_and_drop_through_platform(self):
+        game = PlatformGame()
+        game.state = 'play'
+        platform = game.platforms[1]
+        game.x = float(platform.left + 10)
+        game.y = float(platform.top - game.rect().height)
+        game.grounded = True
+        game.event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_w))
+        self.assertLess(game.vy, 0)
+        game.y = float(platform.top - game.rect().height)
+        game.vy = 0
+        game.grounded = True
+        game.event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_s))
+        game.update(.05)
+        self.assertGreater(game.rect().bottom, platform.top)
+        self.assertFalse(game.grounded)
+        for _ in range(60):
+            game.update(.02)
+        self.assertEqual(game.rect().bottom, 470)
+        game.drop()
+        self.assertTrue(game.grounded)
+
     def test_menu_options_and_restart_clear_combat_state(self):
         game = PlatformGame()
         game.selection = 1
