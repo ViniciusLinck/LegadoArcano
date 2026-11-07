@@ -48,6 +48,8 @@ class PlatformGame:
         self.special_cooldown = 0.
         self.special_time = 0.
         self.boss_defeated = False
+        self.boss_death_time = 0.
+        self.shockwaves = []
         self.action = 'idle'
         self.action_time = 0.
         self.death_time = 0.
@@ -64,14 +66,48 @@ class PlatformGame:
                 ((250,390,130),(490,345,130),(750,300,130),(1040,380,140),(1330,330,160)))
             for x, y, w in layouts[self.level]:
                 self.platforms.append(pygame.Rect(x, y, w, 20))
-            self.enemies = [self.enemy(x) for x in (520, 920, 1310, 1580)]
+            self.enemies = [self.enemy(x, kind=kind) for x, kind in zip((520, 920, 1310, 1580), ('goblin', 'ninja', 'golem', 'goblin'))]
         else:
             self.enemies = [self.enemy(690, True)]
         self.banner = 2.5
 
-    def enemy(self, x, boss=False):
-        return {'x': float(x), 'y': FLOOR - (100 if boss else 44), 'hp': 240 if boss else 35,
-                'maxhp': 240 if boss else 35, 'boss': boss, 'timer': 1.5, 'flash': 0., 'dir': -1, 'dead_time': 0.}
+    def enemy(self, x, boss=False, kind='goblin'):
+        hp = 240 if boss else {'goblin': 35, 'ninja': 30, 'golem': 65}[kind]
+        return {'x': float(x), 'y': FLOOR - (100 if boss else 44), 'hp': hp,
+                'maxhp': hp, 'boss': boss, 'kind': kind, 'timer': 1.5,
+                'flash': 0., 'dir': -1, 'dead_time': 0., 'mode': 'patrol',
+                'home': float(x), 'patrol_dir': -1, 'mode_time': 0., 'attack_count': 0}
+
+    def update_enemy(self, e, dt):
+        distance = abs(self.x - e['x'])
+        kind = e['kind']
+        e['mode_time'] = max(0., e['mode_time'] - dt)
+        if e['mode'] in ('windup', 'recover'):
+            if e['mode_time'] > 0:
+                return
+            if e['mode'] == 'windup':
+                reach = {'goblin': 65, 'ninja': 105, 'golem': 90}[kind]
+                if distance < reach and abs(self.y - e['y']) < 65:
+                    self.hurt_player({'goblin': 8, 'ninja': 10, 'golem': 18}[kind])
+                e['mode'] = 'recover'
+                e['mode_time'] = {'goblin': .65, 'ninja': .8, 'golem': 1.3}[kind]
+                return
+            e['mode'] = 'chase'
+        if distance < 55:
+            e['mode'] = 'windup'
+            e['mode_time'] = {'goblin': .35, 'ninja': .2, 'golem': .75}[kind]
+            return
+        if distance < 260:
+            e['mode'] = 'chase'
+            e['dir'] = -1 if self.x < e['x'] else 1
+            speed = {'goblin': 70, 'ninja': 135, 'golem': 38}[kind]
+            e['x'] = max(0, min(self.width-30, e['x'] + e['dir'] * speed * dt))
+        else:
+            e['mode'] = 'patrol'
+            if abs(e['x'] - e['home']) >= 65:
+                e['patrol_dir'] = -1 if e['x'] > e['home'] else 1
+            e['dir'] = e['patrol_dir']
+            e['x'] += e['dir'] * 25 * dt
 
     def rect(self):
         return pygame.Rect(int(self.x), int(self.y), 30, 48)
@@ -170,9 +206,17 @@ class PlatformGame:
         for e in self.enemies[:]:
             e['flash'] = max(0, e['flash']-dt)
             if e['hp'] <= 0:
+                if e['boss']:
+                    e['dead_time'] += dt
+                    if e['dead_time'] < 1.2:
+                        continue
+                    self.boss_defeated = True
                 self.burst(e['x']+20, e['y']+20, (255, 170, 90), 25)
                 self.enemies.remove(e)
-                if e['boss']: self.boss_defeated = True
+                continue
+            if not e['boss']:
+                self.update_enemy(e, dt)
+                if self.state != 'play': break
                 continue
             e['dir'] = -1 if self.x < e['x'] else 1
             distance = abs(self.x - e['x'])
@@ -184,9 +228,24 @@ class PlatformGame:
             e['timer'] -= dt
             if e['boss'] and e['timer'] <= 0:
                 e['timer'] = .85 if phase2 else 1.5
-                for offset in ((-55, 0, 55) if phase2 else (0,)):
-                    self.projectiles.append({'x': e['x']+40, 'y': e['y']+45, 'vx': e['dir'] * (280 if phase2 else 220), 'vy': offset, 'enemy': True, 'life': 4})
+                if e['attack_count'] % 2:
+                    for wave_dir in (-1, 1):
+                        self.shockwaves.append({'x': e['x']+40, 'vx': wave_dir * (260 if phase2 else 190), 'life': 3.})
+                    self.burst(e['x']+40, FLOOR-5, (213, 169, 115), 18)
+                else:
+                    for offset in ((-55, 0, 55) if phase2 else (0,)):
+                        self.projectiles.append({'x': e['x']+40, 'y': e['y']+45, 'vx': e['dir'] * (280 if phase2 else 220), 'vy': offset, 'enemy': True, 'life': 4})
+                e['attack_count'] += 1
         if self.state != 'play': return
+        for wave in self.shockwaves[:]:
+            wave['x'] += wave['vx'] * dt
+            wave['life'] -= dt
+            hitbox = pygame.Rect(wave['x']-13, FLOOR-20, 26, 20)
+            if hitbox.colliderect(self.rect()):
+                self.hurt_player(15)
+                wave['life'] = 0
+            if wave['life'] <= 0 or not 0 <= wave['x'] <= self.width:
+                self.shockwaves.remove(wave)
         for p in self.projectiles[:]:
             p['x'] += p['vx'] * dt
             p['y'] += p.get('vy', 0) * dt
@@ -281,14 +340,24 @@ class PlatformGame:
                 if e['timer'] < .45:
                     warning = pygame.Surface((W, 18), pygame.SRCALPHA)
                     warning.fill((255, 75, 75, 80 if int(self.time*12)%2 else 35))
-                    self.screen.blit(warning, (0, int(e['y']+36)))
-                self.draw_art(self.art['mobs'][3][int(self.time*(11 if phase2 else 7))%3], (150,135), x-35, e['y']-35, e['dir']<0)
+                    warning_y = FLOOR-18 if e['attack_count'] % 2 else int(e['y']+36)
+                    self.screen.blit(warning, (0, warning_y))
+                if e['hp'] <= 0:
+                    progress = min(1., e['dead_time']/1.2)
+                    self.draw_art(self.art['mobs'][3][0], (150, max(4, int(135*(1-progress)))), x-35, FLOOR-max(4,int(135*(1-progress))), e['dir']<0)
+                    if int(self.time*15)%2:
+                        pygame.draw.circle(self.screen, (250,190,120), (int(x+40),int(e['y']+50)), int(12+progress*35), 3)
+                else:
+                    self.draw_art(self.art['mobs'][3][int(self.time*(11 if phase2 else 7))%3], (150,135), x-35, e['y']-35, e['dir']<0)
                 pygame.draw.rect(self.screen, (70,33,47), (250,35,460,15))
                 pygame.draw.rect(self.screen, (204,61,83) if phase2 else (141,102,215), (250,35,int(460*max(0,e['hp'])/e['maxhp']),15))
                 self.text('GUARDIÃO ANCIÃO  •  ' + ('FASE 2' if phase2 else 'FASE 1'), 480, 20, font=self.small)
             else:
                 frame = int(self.time*7)%3
-                self.draw_art(self.art['mobs'][self.level%4][frame], (65,65), x-17, e['y']-21, e['dir']<0)
+                art_index = {'goblin': 2, 'ninja': 1, 'golem': 3}[e['kind']]
+                if e['mode'] == 'windup':
+                    pygame.draw.circle(self.screen, (240, 110, 90), (int(x+15), int(e['y']-10)), 8, 2)
+                self.draw_art(self.art['mobs'][art_index][frame], (65,65), x-17, e['y']-21, e['dir']<0)
         keys = pygame.key.get_pressed()
         moving = keys[pygame.K_d] or keys[pygame.K_a] or keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]
         action = ('death' if self.state in ('dying','defeat') else 'hit' if self.hurt else 'dash' if self.dash_timer else 'attack' if self.attack_timer else
@@ -305,6 +374,9 @@ class PlatformGame:
             self.draw_art(frame, (70,75), self.x-self.camera-20, self.y-27, self.facing<0)
         if self.attack_timer and self.class_index == 1:
             pygame.draw.arc(self.screen, (245,237,219), (self.x-self.camera + (13 if self.facing>0 else -53), self.y-12, 70,70), -1.5, 1.5, 5)
+        for wave in self.shockwaves:
+            x = int(wave['x']-self.camera)
+            pygame.draw.polygon(self.screen, (255, 190, 105), [(x-16,FLOOR),(x,FLOOR-22),(x+16,FLOOR)])
         for p in self.projectiles:
             color = (235,89,118) if p['enemy'] else COLORS[self.class_index]
             pygame.draw.circle(self.screen, color, (int(p['x']-self.camera),int(p['y'])), 8)

@@ -1,4 +1,4 @@
-﻿# Auditoria dos requisitos acadêmicos
+# Auditoria dos requisitos acadêmicos
 
 O PDF original não estava disponível no repositório ou anexos acessíveis. Esta lista verifica apenas os requisitos transcritos pelo usuário; a correspondência literal com o enunciado depende de conferir o PDF.
 
@@ -15,4 +15,4 @@ O PDF original não estava disponível no repositório ou anexos acessíveis. Es
 
 ## Limitações da especificação expandida
 
-As quatro áreas são lineares; não há estrutura completa de metroidvania nem exploração interligada. Os inimigos usam essencialmente a mesma lógica de perseguição e contato; não há três IAs completas. O chefe não possui ataque especial de impacto no chão nem animação de derrota dedicada. Animações derivam de pranchas compostas e ainda precisam de revisão manual de recortes e alinhamento. Não foram demonstradas todas as combinações de jogo real até o fim.
+As quatro áreas são lineares; não há estrutura completa de metroidvania nem exploração interligada. Goblin, ninja e golem patrulham, perseguem e possuem preparação e recuperação distintas; suas IAs ainda são simples. O chefe alterna projéteis e ondas de impacto no chão e tem uma sequência de derrota procedural. Animações derivam de pranchas compostas e ainda precisam de revisão manual de recortes e alinhamento. Não foram demonstradas todas as combinações de jogo real até o fim.
