@@ -6,3 +6,8 @@ __pycache__/
 *.py[cod]
 build/
 dist/
+!docs/superpowers/
+!docs/superpowers/plans/
+!docs/superpowers/plans/2026-11-06-demo-animada.md
+!docs/superpowers/specs/
+!docs/superpowers/specs/2026-11-06-demo-animada-design.md
