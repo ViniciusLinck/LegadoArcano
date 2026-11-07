@@ -6,6 +6,53 @@ import pygame
 from src.platformer import PlatformGame
 
 class PlatformDemoTest(unittest.TestCase):
+    def test_jump_lands_on_first_platform_in_every_level(self):
+        game = PlatformGame()
+        game.state = 'play'
+        for level in range(4):
+            game.level = level
+            game.load_level()
+            game.enemies.clear()
+            platform = game.platforms[1]
+            game.x = float(platform.left + 15)
+            game.update(.02)
+            game.jump()
+            for _ in range(70):
+                game.update(.016)
+            self.assertEqual(game.rect().bottom, platform.top, f'level {level+1}')
+            self.assertTrue(game.grounded)
+
+    def test_landing_prefers_first_platform_crossed(self):
+        game = PlatformGame()
+        game.state = 'play'
+        game.enemies.clear()
+        game.platforms = [pygame.Rect(0, 470, 500, 70), pygame.Rect(0, 450, 500, 10)]
+        game.x, game.y, game.vy = 100., 370., 850.
+        game.update(.1)
+        self.assertEqual(game.rect().bottom, 450)
+        self.assertTrue(game.grounded)
+
+    def test_mouse_hover_and_click_select_class(self):
+        game = PlatformGame()
+        game.choose()
+        point = game.class_cards()[2].center
+        game.event(pygame.event.Event(pygame.MOUSEMOTION, pos=point, rel=(0, 0), buttons=(0, 0, 0)))
+        self.assertEqual(game.selection, 2)
+        game.draw()
+        game.event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=point, button=1))
+        self.assertEqual((game.state, game.class_index), ('play', 2))
+
+    def test_buffered_jump_fires_after_landing(self):
+        game = PlatformGame()
+        game.state = 'play'
+        game.enemies.clear()
+        game.x, game.y, game.vy = 80., 410., 200.
+        game.grounded = False
+        game.jump()
+        game.update(.05)
+        self.assertLess(game.vy, 0)
+        self.assertFalse(game.grounded)
+
     def test_wasd_jump_and_drop_through_platform(self):
         game = PlatformGame()
         game.state = 'play'

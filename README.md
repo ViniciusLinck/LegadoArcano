@@ -2,6 +2,8 @@
 
 Demo de ação e plataforma 2D lateral em Python e Pygame. Escolha Mago, Cavaleiro ou Arqueiro, atravesse quatro áreas e enfrente o Golem Ancião. Derrote-o e alcance o portal final. O projeto é uma demo linear, ainda não um metroidvania completo.
 
+Na seleção, passe o mouse sobre um personagem para ver sua animação e clique para escolhê-lo; também é possível usar as setas e Enter. As bordas claras indicam as plataformas em que é possível aterrissar.
+
 ## Executar a partir do código
 
 Requer Windows, Python 3.12 e Pygame. Na pasta do projeto:

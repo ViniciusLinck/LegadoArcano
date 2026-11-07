@@ -44,6 +44,8 @@ class PlatformGame:
         self.x, self.y, self.vy = 80., float(FLOOR - 48), 0.
         self.grounded, self.facing = False, 1
         self.drop_platform = None
+        self.coyote_time = 0.
+        self.jump_buffer = 0.
         self.attack_timer = self.dash_timer = self.cooldown = self.hurt = 0.
         self.dash_cooldown = 0.
         self.special_cooldown = 0.
@@ -63,7 +65,7 @@ class PlatformGame:
             layouts = (
                 ((290,380,140),(550,315,120),(850,390,150),(1130,330,140),(1450,380,130)),
                 ((240,390,120),(460,330,140),(750,365,120),(1030,300,150),(1410,375,160)),
-                ((300,360,170),(610,400,130),(850,325,130),(1150,385,170),(1480,315,140)),
+                ((300,385,170),(610,400,130),(850,325,130),(1150,385,170),(1480,315,140)),
                 ((250,390,130),(490,345,130),(750,300,130),(1040,380,140),(1330,330,160)))
             for x, y, w in layouts[self.level]:
                 self.platforms.append(pygame.Rect(x, y, w, 20))
@@ -118,9 +120,15 @@ class PlatformGame:
             self.particles.append([x, y, random.uniform(-100, 100), random.uniform(-140, 30), random.uniform(.2, .55), color])
 
     def jump(self):
-        if self.grounded:
+        self.jump_buffer = .12
+        self.try_jump()
+
+    def try_jump(self):
+        if self.jump_buffer > 0 and (self.grounded or self.coyote_time > 0):
             self.vy = -510
             self.grounded = False
+            self.coyote_time = 0.
+            self.jump_buffer = 0.
             self.burst(self.x + 15, self.y + 48, (180, 169, 166), 5)
 
     def drop(self):
@@ -131,6 +139,8 @@ class PlatformGame:
             if abs(feet - platform.top) <= 1 and self.rect().right > platform.left and self.rect().left < platform.right:
                 self.drop_platform = platform
                 self.grounded = False
+                self.coyote_time = 0.
+                self.jump_buffer = 0.
                 self.y += 2
                 self.vy = max(self.vy, 40)
                 break
@@ -200,22 +210,33 @@ class PlatformGame:
         self.dash_cooldown = max(0, self.dash_cooldown-dt)
         self.attack_timer = max(0, self.attack_timer-dt)
         self.dash_timer = max(0, self.dash_timer-dt)
+        self.jump_buffer = max(0., self.jump_buffer-dt)
+        self.coyote_time = .10 if self.grounded else max(0., self.coyote_time-dt)
+        self.try_jump()
         keys = pygame.key.get_pressed()
         direction = int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(keys[pygame.K_a] or keys[pygame.K_LEFT])
         if direction and self.dash_timer <= 0: self.facing = direction
         speed = self.facing * 470 if self.dash_timer else direction * 210
         self.x = max(0, min(self.width-30, self.x + speed * dt))
         previous_bottom = self.y + 48
+        was_falling = self.vy > 130
         self.vy = min(850, self.vy + 1250 * dt)
         self.y += self.vy * dt
         self.grounded = False
         if self.drop_platform is not None and self.y >= self.drop_platform.bottom:
             self.drop_platform = None
-        for p in self.platforms:
-            if p is self.drop_platform:
-                continue
-            if self.vy >= 0 and previous_bottom <= p.top and self.y + 48 >= p.top and self.x + 30 > p.left and self.x < p.right:
-                self.y, self.vy, self.grounded = float(p.top-48), 0., True
+        landing = [p for p in self.platforms if p is not self.drop_platform
+                   and self.vy >= 0 and previous_bottom <= p.top <= self.y + 48
+                   and self.x + 30 > p.left and self.x < p.right]
+        if landing:
+            surface = min(landing, key=lambda p: p.top)
+            self.y, self.vy, self.grounded = float(surface.top-48), 0., True
+            self.coyote_time = .10
+            if was_falling:
+                self.burst(self.x + 15, self.y + 48, (180, 169, 166), 6)
+            self.try_jump()
+        if self.dash_timer > 0 and random.random() < min(1., dt * 25):
+            self.burst(self.x + 15, self.y + 30, COLORS[self.class_index], 2)
         self.camera = max(0, min(self.width-W, self.x-W*.35))
         if any(self.rect().colliderect(hazard) for hazard in self.hazards):
             self.hurt_player(12)
@@ -316,12 +337,35 @@ class PlatformGame:
             y = 80 + (i*79)%300 + math.sin(self.time*2+i)*4
             pygame.draw.circle(self.screen, (80, 120, 145), (int(x), int(y)), 2)
 
+    def class_cards(self):
+        return [pygame.Rect(75 + i * 275, 190, 260, 220) for i in range(3)]
+
+    def draw_class_selection(self):
+        self.text('Escolha sua classe', W//2, 140, (246, 190, 125), self.big)
+        descriptions = ('Explosão arcana', 'Espada e golpe pesado', 'Flecha perfurante')
+        for i, card in enumerate(self.class_cards()):
+            selected = i == self.selection
+            pygame.draw.rect(self.screen, (51, 43, 56) if selected else (25, 27, 41), card, border_radius=8)
+            pygame.draw.rect(self.screen, (238, 183, 113) if selected else (88, 80, 91), card, 3 if selected else 1, border_radius=8)
+            frames = self.art['actors'][i]['run' if selected else 'idle']
+            frame = frames[int(self.time * (8 if selected else 3)) % len(frames)]
+            bob = math.sin(self.time * 6) * 3 if selected else 0
+            self.draw_art(frame, (140, 150), card.centerx-70, card.top+8+bob)
+            self.text(CLASSES[i], card.centerx, card.bottom-54, COLORS[i])
+            self.text(descriptions[i], card.centerx, card.bottom-23, font=self.small)
+        back = pygame.Rect(W//2-90, 435, 180, 42)
+        pygame.draw.rect(self.screen, (66, 55, 74) if self.selection == 3 else (27, 27, 42), back, border_radius=6)
+        pygame.draw.rect(self.screen, (221, 157, 97) if self.selection == 3 else (92, 79, 88), back, 2, border_radius=6)
+        self.text('Voltar', back.centerx, back.centery)
+        self.text('Passe o mouse ou use as setas; clique ou pressione Enter', W//2, 500, font=self.small)
+
     def draw(self):
         self.background()
         if self.state in ('menu', 'options', 'classes'):
             if self.state == 'classes':
-                self.screen.blit(self.art['selection'], (0, 0))
-                shade = pygame.Surface((W,H), pygame.SRCALPHA); shade.fill((8,8,20,155)); self.screen.blit(shade,(0,0))
+                self.draw_class_selection()
+                pygame.display.flip()
+                return
             self.text('LEGADO ARCANO', W//2, 100, (246,190,125), self.big)
             if self.state == 'menu':
                 self.text('UMA AVENTURA DE PLATAFORMA', W//2, 157, font=self.small)
@@ -332,16 +376,12 @@ class PlatformGame:
             elif self.state == 'options':
                 self.buttons(('Som: ' + ('Ligado' if self.sound else 'Desligado'), 'Voltar'))
                 self.text('A/D: mover | W: pular | S: descer | J: atacar', W//2, 440, font=self.small)
-            else:
-                self.text('Escolha sua classe', W//2, 175)
-                self.buttons(CLASSES + ('Voltar',))
-                descriptions = ('Magia a média distância - explosão arcana', 'Espada corpo a corpo - golpe pesado', 'Flechas rápidas - disparo perfurante', '')
-                self.text(descriptions[self.selection], W//2, 480, font=self.small)
             pygame.display.flip(); return
         for p in self.platforms:
             r = p.move(-self.camera, 0)
             pygame.draw.rect(self.screen, (54,48,62), r)
-            pygame.draw.rect(self.screen, (131,115,128), (r.x,r.y,r.w,6))
+            pygame.draw.rect(self.screen, (198,169,157), (r.x,r.y,r.w,5))
+            pygame.draw.line(self.screen, (105, 203, 218), (r.left, r.top), (r.right, r.top), 2)
             for x in range(r.x, r.right, 48): pygame.draw.line(self.screen, (77,67,80), (x,r.y+8), (x,r.bottom), 2)
         for hazard in self.hazards:
             x = hazard.x-self.camera
@@ -350,6 +390,8 @@ class PlatformGame:
         if self.level < 4 or self.boss_defeated:
             x = self.width-60-self.camera
             pygame.draw.ellipse(self.screen, (111, 77, 180) if not self.enemies else (65,57,78), (x, FLOOR-95, 45, 95), 5)
+            if not self.enemies:
+                pygame.draw.ellipse(self.screen, (140, 190, 255), (x+8, FLOOR-82, 29, 70), 2)
         for e in self.enemies:
             x = e['x']-self.camera
             if e['boss']:
@@ -391,12 +433,21 @@ class PlatformGame:
             self.draw_art(frame, (70,75), self.x-self.camera-20, self.y-27, self.facing<0)
         if self.attack_timer and self.class_index == 1:
             pygame.draw.arc(self.screen, (245,237,219), (self.x-self.camera + (13 if self.facing>0 else -53), self.y-12, 70,70), -1.5, 1.5, 5)
+        if self.special_time:
+            radius = int(22 + (0.4-self.special_time) * 180)
+            pygame.draw.circle(self.screen, COLORS[self.class_index], (int(self.x-self.camera+15), int(self.y+24)), radius, 3)
         for wave in self.shockwaves:
             x = int(wave['x']-self.camera)
             pygame.draw.polygon(self.screen, (255, 190, 105), [(x-16,FLOOR),(x,FLOOR-22),(x+16,FLOOR)])
         for p in self.projectiles:
             color = (235,89,118) if p['enemy'] else COLORS[self.class_index]
-            pygame.draw.circle(self.screen, color, (int(p['x']-self.camera),int(p['y'])), 8)
+            if not p['enemy'] and self.class_index == 2:
+                x, y = int(p['x']-self.camera), int(p['y'])
+                direction = 1 if p['vx'] > 0 else -1
+                pygame.draw.line(self.screen, color, (x-15*direction, y), (x+13*direction, y), 3)
+                pygame.draw.polygon(self.screen, color, [(x+15*direction,y),(x+7*direction,y-5),(x+7*direction,y+5)])
+            else:
+                pygame.draw.circle(self.screen, color, (int(p['x']-self.camera),int(p['y'])), 8)
             if not p['enemy'] and self.class_index == 0:
                 self.draw_art(self.art['effects'][int(self.time*12)%4], (45,45), p['x']-self.camera-22, p['y']-22, p['vx']<0)
             pygame.draw.circle(self.screen, (255,245,218), (int(p['x']-self.camera),int(p['y'])), 3)
@@ -439,13 +490,19 @@ class PlatformGame:
         if self.state in ('menu','options','classes'):
             count = {'menu':3,'options':2,'classes':4}[self.state]
             if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_DOWN,pygame.K_s): self.selection = (self.selection+1)%count
-                elif event.key in (pygame.K_UP,pygame.K_w): self.selection = (self.selection-1)%count
+                if event.key in (pygame.K_DOWN,pygame.K_s,pygame.K_RIGHT,pygame.K_d): self.selection = (self.selection+1)%count
+                elif event.key in (pygame.K_UP,pygame.K_w,pygame.K_LEFT,pygame.K_a): self.selection = (self.selection-1)%count
                 elif event.key in (pygame.K_RETURN,pygame.K_KP_ENTER): self.choose()
                 elif event.key == pygame.K_ESCAPE and self.state != 'menu': self.state='menu'; self.selection=0
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                for i in range(count):
-                    if pygame.Rect(W//2-150,210+i*62,300,48).collidepoint(event.pos): self.selection=i; self.choose(); break
+            elif event.type == pygame.MOUSEMOTION or (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1):
+                rects = (self.class_cards() + [pygame.Rect(W//2-90, 435, 180, 42)] if self.state == 'classes'
+                         else [pygame.Rect(W//2-150,210+i*62,300,48) for i in range(count)])
+                for i, rect in enumerate(rects):
+                    if rect.collidepoint(event.pos):
+                        self.selection = i
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            self.choose()
+                        break
         elif event.type == pygame.KEYDOWN:
             if self.state == 'play':
                 if event.key in (pygame.K_SPACE, pygame.K_w, pygame.K_UP): self.jump()
