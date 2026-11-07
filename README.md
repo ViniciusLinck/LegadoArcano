@@ -14,7 +14,7 @@ py -3.12 -m venv .venv
 
 ## Controles
 
-A/D ou setas movem, Espaço/W/seta para cima pula, J/Z ataca, K usa o especial, Shift esquiva e Esc pausa. Enter confirma; menus aceitam mouse. Na pausa, Enter continua, R reinicia e M retorna ao menu. Na derrota ou vitória, R reinicia e Enter retorna ao menu.
+A/D move, W pula e S desce de plataformas elevadas. As setas também funcionam, assim como Espaço para pular. J/Z ataca, K usa o especial, Shift esquiva e Esc pausa. Enter confirma; menus aceitam mouse. Na pausa, Enter continua, R reinicia e M retorna ao menu. Na derrota ou vitória, R reinicia e Enter retorna ao menu.
 
 O mago lança projéteis e uma explosão, o cavaleiro usa espada e golpe pesado e o arqueiro dispara flechas e um disparo perfurante. Especiais possuem recarga. Espinhos e inimigos causam dano; goblins, ninjas e golens têm velocidades e ataques diferentes. O chefe alterna projéteis e ondas no chão. A barra mostra a vida. Ao zerá-la, a partida termina.
 
